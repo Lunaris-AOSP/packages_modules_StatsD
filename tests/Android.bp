@@ -50,4 +50,5 @@ java_test_host {
         ":StatsdAtomStormApp",
         ":StatsdAtomStormApp2",
     ],
+    jarjar_rules: "jarjar-rules.txt",
 }
