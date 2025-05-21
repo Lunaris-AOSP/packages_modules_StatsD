@@ -27,10 +27,10 @@ cc_defaults {
     srcs: [
         "stats_buffer_writer.cpp",
         "stats_buffer_writer_queue.cpp",
-        "stats_event.c",
-        "stats_socket.c",
-        "statsd_writer.cpp",
+        "stats_event.cpp",
+        "stats_socket.cpp",
         "stats_socket_loss_reporter.cpp",
+        "statsd_writer.cpp",
         "utils.cpp",
     ],
     local_include_dirs: [
