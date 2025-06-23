@@ -1240,28 +1240,36 @@ Status StatsService::addConfiguration(int64_t key, const vector <uint8_t>& confi
     ATRACE_CALL();
     ENFORCE_UID(AID_SYSTEM);
 
-    if (addConfigurationChecked(callingUid, key, config)) {
-        return Status::ok();
-    } else {
+    StatsdConfig cfg;
+    if (!cfg.ParseFromArray(config.data(), config.size())) {
         return exception(EX_ILLEGAL_ARGUMENT, "Could not parse malformatted StatsdConfig.");
     }
+    addConfigurationChecked(key, callingUid, cfg);
+    return Status::ok();
 }
 
-bool StatsService::addConfigurationChecked(int uid, int64_t key, const vector<uint8_t>& config) {
+Status StatsService::addConfigurationFd(int64_t key, const ScopedFileDescriptor& configFd,
+                                        const int32_t callingUid) {
+    ATRACE_CALL();
+    ENFORCE_UID(AID_SYSTEM);
+
+    StatsdConfig cfg;
+    if (!cfg.ParseFromFileDescriptor(configFd.get())) {
+        return exception(EX_ILLEGAL_ARGUMENT, "Could not parse malformatted StatsdConfig.");
+    }
+    addConfigurationChecked(key, callingUid, cfg);
+    return Status::ok();
+}
+
+void StatsService::addConfigurationChecked(int64_t key, int32_t callingUid,
+                                           const StatsdConfig& cfg) {
+    ConfigKey cfgKey(callingUid, key);
     const bool pastFilterState = mLogEventFilter->getFilteringEnabled();
     // disabling filter to avoid skipping potentially interesting atoms required by
     // the new or updated configuration
     mLogEventFilter->setFilteringEnabled(false);
-    ConfigKey configKey(uid, key);
-    StatsdConfig cfg;
-    if (config.size() > 0) {  // If the config is empty, skip parsing.
-        if (!cfg.ParseFromArray(&config[0], config.size())) {
-            return false;
-        }
-    }
-    mConfigManager->UpdateConfig(configKey, cfg);
+    mConfigManager->UpdateConfig(cfgKey, cfg);
     mLogEventFilter->setFilteringEnabled(pastFilterState);
-    return true;
 }
 
 Status StatsService::removeDataFetchOperation(int64_t key,
