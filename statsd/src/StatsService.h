@@ -101,9 +101,7 @@ public:
     /**
      * Binder call for clients to request data for this configuration key.
      */
-    virtual Status getData(int64_t key,
-                           const int32_t callingUid,
-                           vector<uint8_t>* output) override;
+    virtual Status getData(int64_t key, const int32_t callingUid, vector<uint8_t>* output) override;
 
     virtual Status getDataFd(int64_t key, const int32_t callingUid,
                              const ScopedFileDescriptor& fd) override;
@@ -113,27 +111,23 @@ public:
      */
     virtual Status getMetadata(vector<uint8_t>* output) override;
 
-
     /**
      * Binder call to let clients send a configuration and indicate they're interested when they
      * should requestData for this configuration.
      */
-    virtual Status addConfiguration(int64_t key,
-                                    const vector<uint8_t>& config,
+    virtual Status addConfiguration(int64_t key, const vector<uint8_t>& config,
                                     const int32_t callingUid) override;
 
     /**
      * Binder call to let clients register the data fetch operation for a configuration.
      */
-    virtual Status setDataFetchOperation(int64_t key,
-                                         const shared_ptr<IPendingIntentRef>& pir,
+    virtual Status setDataFetchOperation(int64_t key, const shared_ptr<IPendingIntentRef>& pir,
                                          const int32_t callingUid) override;
 
     /**
      * Binder call to remove the data fetch operation for the specified config key.
      */
-    virtual Status removeDataFetchOperation(int64_t key,
-                                            const int32_t callingUid) override;
+    virtual Status removeDataFetchOperation(int64_t key, const int32_t callingUid) override;
 
     /**
      * Binder call to let clients register the active configs changed operation.
@@ -149,22 +143,19 @@ public:
     /**
      * Binder call to allow clients to remove the specified configuration.
      */
-    virtual Status removeConfiguration(int64_t key,
-                                       const int32_t callingUid) override;
+    virtual Status removeConfiguration(int64_t key, const int32_t callingUid) override;
 
     /**
      * Binder call to associate the given config's subscriberId with the given pendingIntentRef.
      */
-    virtual Status setBroadcastSubscriber(int64_t configId,
-                                          int64_t subscriberId,
+    virtual Status setBroadcastSubscriber(int64_t configId, int64_t subscriberId,
                                           const shared_ptr<IPendingIntentRef>& pir,
                                           const int32_t callingUid) override;
 
     /**
      * Binder call to unassociate the given config's subscriberId with any pendingIntentRef.
      */
-    virtual Status unsetBroadcastSubscriber(int64_t configId,
-                                            int64_t subscriberId,
+    virtual Status unsetBroadcastSubscriber(int64_t configId, int64_t subscriberId,
                                             const int32_t callingUid) override;
 
     /** Inform statsCompanion that statsd is ready. */
@@ -293,7 +284,6 @@ private:
      */
     status_t cmd_trigger_broadcast(int outFd, Vector<String8>& args);
 
-
     /**
      * Trigger an active configs changed broadcast.
      */
@@ -381,7 +371,7 @@ private:
      * 2. the device is mEngBuild, or
      * 3. the caller is AID_ROOT and the uid is AID_SHELL (i.e. ROOT can impersonate SHELL).
      */
-     bool getUidFromString(const char* uidString, int32_t& uid);
+    bool getUidFromString(const char* uidString, int32_t& uid);
 
     /**
      * Adds a configuration after checking permissions and obtaining UID from binder call.
