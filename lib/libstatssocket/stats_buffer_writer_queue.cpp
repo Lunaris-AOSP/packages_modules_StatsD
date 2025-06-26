@@ -17,6 +17,7 @@
 #include "stats_buffer_writer_queue.h"
 
 #include <private/android_filesystem_config.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 
 #include <chrono>
@@ -31,8 +32,7 @@ namespace {
 constexpr int32_t kBootTimeEventElapsedTimeAtomId = 240;
 }
 
-BufferWriterQueue::BufferWriterQueue() : mWorkThread(&BufferWriterQueue::processCommands, this) {
-    pthread_setname_np(mWorkThread.native_handle(), "socket_writer_queue");
+BufferWriterQueue::BufferWriterQueue() {
 }
 
 BufferWriterQueue::~BufferWriterQueue() {
@@ -55,7 +55,19 @@ size_t BufferWriterQueue::getQueueSize() const {
     return mCmdQueue.size();
 }
 
+void BufferWriterQueue::startWorkerThread() {
+    // in Android pthread creation triggers wakelockStateChanged atom logging:
+    // to prevent re-entrance here atomic check is added.
+    // see http://b/415498159#comment4
+    if (!mWorkerThreadStarted) {
+        mWorkerThreadStarted = true;
+        mWorkThread = std::thread(&BufferWriterQueue::processCommands, this);
+    }
+}
+
 bool BufferWriterQueue::pushToQueue(const Cmd& cmd) {
+    // start worker thread only when there is an actual data to be processed
+    startWorkerThread();
     {
         std::unique_lock<std::mutex> lock(mMutex);
         if (mCmdQueue.size() >= kQueueMaxSizeLimit) {
@@ -101,6 +113,7 @@ void BufferWriterQueue::drainQueue() {
 }
 
 void BufferWriterQueue::processCommands() {
+    prctl(PR_SET_NAME, "socket_writer_queue");
     while (true) {
         // temporary local thread copy
         Cmd cmd;
