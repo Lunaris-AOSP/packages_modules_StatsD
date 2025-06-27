@@ -266,7 +266,7 @@ TEST(MultiConditionTrigger, TestTriggerHasSleepEarlyTermination) {
         // notify to terminate trigger executor thread after triggerEarlyTerminationDelayMs
         std::this_thread::sleep_for(std::chrono::milliseconds(triggerEarlyTerminationDelayMs));
         {
-            std::unique_lock<std::mutex> lk(triggerTerminationFlagMutex);
+            std::lock_guard<std::mutex> lk(triggerTerminationFlagMutex);
             terminationRequested = true;
         }
         triggerTerminationFlag.notify_all();

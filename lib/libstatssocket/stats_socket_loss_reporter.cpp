@@ -62,7 +62,7 @@ void StatsSocketLossReporter::noteDrop(int32_t error, int32_t atomId) {
         return;
     }
 
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
 
     // using unordered_map is more CPU efficient vs vectors, however will require some
     // postprocessing before writing into the socket
@@ -94,7 +94,7 @@ void StatsSocketLossReporter::dumpAtomsLossStats(bool forceDump) {
     startCooldownTimer(currentRealtimeTsNanos);
 
     // intention to hold mutex here during the stats_write() to avoid data copy overhead
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
     if (mLossInfo.size() == 0) {
         return;
     }

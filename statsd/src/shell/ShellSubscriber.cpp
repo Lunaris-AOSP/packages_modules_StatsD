@@ -34,7 +34,7 @@ namespace statsd {
 
 ShellSubscriber::~ShellSubscriber() {
     {
-        std::unique_lock<std::mutex> lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
         mClientSet.clear();
         updateLogEventFilterLocked();
     }
@@ -45,7 +45,7 @@ ShellSubscriber::~ShellSubscriber() {
 }
 
 bool ShellSubscriber::startNewSubscription(int in, int out, int64_t timeoutSec) {
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
     VLOG("ShellSubscriber: new subscription has come in");
     if (mClientSet.size() >= kMaxSubscriptions) {
         ALOGE("ShellSubscriber: cannot have another active subscription. Current Subscriptions: "
@@ -60,7 +60,7 @@ bool ShellSubscriber::startNewSubscription(int in, int out, int64_t timeoutSec) 
 
 bool ShellSubscriber::startNewSubscription(const vector<uint8_t>& subscriptionConfig,
                                            const shared_ptr<IStatsSubscriptionCallback>& callback) {
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
     VLOG("ShellSubscriber: new subscription has come in");
     if (mClientSet.size() >= kMaxSubscriptions) {
         ALOGE("ShellSubscriber: cannot have another active subscription. Current Subscriptions: "
@@ -136,7 +136,7 @@ void ShellSubscriber::onLogEvent(const LogEvent& event) {
     if (event.isRestricted()) {
         return;
     }
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
     for (auto clientIt = mClientSet.begin(); clientIt != mClientSet.end();) {
         (*clientIt)->onLogEvent(event);
         if ((*clientIt)->isAlive()) {
@@ -152,7 +152,7 @@ void ShellSubscriber::onLogEvent(const LogEvent& event) {
 }
 
 void ShellSubscriber::flushSubscription(const shared_ptr<IStatsSubscriptionCallback>& callback) {
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
 
     // TODO(b/268822860): Consider storing callback clients in a map keyed by
     // IStatsSubscriptionCallback to avoid this linear search.
@@ -177,7 +177,7 @@ void ShellSubscriber::flushSubscription(const shared_ptr<IStatsSubscriptionCallb
 }
 
 void ShellSubscriber::unsubscribe(const shared_ptr<IStatsSubscriptionCallback>& callback) {
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
 
     // TODO(b/268822860): Consider storing callback clients in a map keyed by
     // IStatsSubscriptionCallback to avoid this linear search.
