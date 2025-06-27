@@ -59,8 +59,7 @@ void BufferWriterQueue::startWorkerThread() {
     // in Android pthread creation triggers wakelockStateChanged atom logging:
     // to prevent re-entrance here atomic check is added.
     // see http://b/415498159#comment4
-    if (!mWorkerThreadStarted) {
-        mWorkerThreadStarted = true;
+    if (!mWorkerThreadStarted.exchange(true, std::memory_order_relaxed)) {
         mWorkThread = std::thread(&BufferWriterQueue::processCommands, this);
     }
 }
