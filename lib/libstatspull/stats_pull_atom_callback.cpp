@@ -315,7 +315,7 @@ private:
     }
 
     void pushToQueue(std::unique_ptr<Cmd> cmd) {
-        std::unique_lock<std::mutex> lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
         mCmdQueue.push(std::move(cmd));
     }
 
@@ -341,7 +341,7 @@ private:
         if (!statsService) {
             // Statsd not available - dropping all submitted command requests
             std::queue<std::unique_ptr<Cmd>> emptyQueue;
-            std::unique_lock<std::mutex> lock(mMutex);
+            std::lock_guard<std::mutex> lock(mMutex);
             mCmdQueue.swap(emptyQueue);
             mThreadAlive = false;
             return;
@@ -353,7 +353,7 @@ private:
                 /**
                  * To guarantee sequential commands processing we need to lock mutex queue
                  */
-                std::unique_lock<std::mutex> lock(mMutex);
+                std::lock_guard<std::mutex> lock(mMutex);
                 if (mCmdQueue.empty()) {
                     mThreadAlive = false;
                     return;

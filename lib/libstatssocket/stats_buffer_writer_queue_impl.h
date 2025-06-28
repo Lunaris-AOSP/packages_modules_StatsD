@@ -50,8 +50,11 @@ private:
     std::queue<Cmd> mCmdQueue;
     std::atomic_bool mDoTerminate = false;
     std::thread mWorkThread;
+    std::atomic_bool mWorkerThreadStarted = false;
 
     static Cmd createWriteBufferCmd(const uint8_t* buffer, size_t size, uint32_t atomId);
+
+    void startWorkerThread();
 
     bool pushToQueue(const Cmd& cmd);
 
