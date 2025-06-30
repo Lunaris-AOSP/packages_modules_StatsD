@@ -67,15 +67,13 @@ void BufferWriterQueue::startWorkerThread() {
 bool BufferWriterQueue::pushToQueue(const Cmd& cmd) {
     // start worker thread only when there is an actual data to be processed
     startWorkerThread();
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (mCmdQueue.size() >= kQueueMaxSizeLimit) {
-            // TODO (b/258003151): add logging info about internal queue overflow with appropriate
-            // error code
-            return false;
-        }
-        mCmdQueue.push(cmd);
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mCmdQueue.size() >= kQueueMaxSizeLimit) {
+        // TODO (b/258003151): add logging info about internal queue overflow with appropriate
+        // error code
+        return false;
     }
+    mCmdQueue.push(cmd);
     mCondition.notify_one();
     return true;
 }
