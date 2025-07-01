@@ -24,6 +24,8 @@
 #include <src/active_config_list.pb.h>
 #include <src/experiment_ids.pb.h>
 
+#include <random>
+
 #include "StatsService.h"
 #include "android-base/stringprintf.h"
 #include "external/StatsPullerManager.h"
@@ -99,6 +101,12 @@ const char* getOnLogEventCallName(int32_t tagId) {
     name.reserve(30);
     name = "OnLogEvent-" + std::to_string(tagId);
     return name.c_str();
+}
+
+int generate_rand_int() {
+    thread_local std::mt19937 engine(std::random_device{}());
+    thread_local std::uniform_int_distribution<int> dist;
+    return dist(engine);
 }
 
 }  // namespace
@@ -408,8 +416,11 @@ void StatsLogProcessor::resetConfigsLocked(const int64_t timestampNs) {
 }
 
 void StatsLogProcessor::OnLogEvent(LogEvent* event) {
-    ATRACE_NAME(getOnLogEventCallName(event->GetTagId()));
+    const char* name = getOnLogEventCallName(event->GetTagId());
+    const int cookie = generate_rand_int();
+    ATRACE_ASYNC_BEGIN(name, cookie);
     OnLogEvent(event, getElapsedRealtimeNs());
+    ATRACE_ASYNC_END(name, cookie);
 }
 
 void StatsLogProcessor::OnLogEvent(LogEvent* event, int64_t elapsedRealtimeNs) {
