@@ -18,6 +18,9 @@
 #include <stats_socket_loss_reporter.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <mutex>
+#include <utility>
 #include <vector>
 
 #include "stats_statsdsocketlog.h"

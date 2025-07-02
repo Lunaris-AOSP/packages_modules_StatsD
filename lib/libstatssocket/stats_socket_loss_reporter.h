@@ -20,8 +20,10 @@
 #include <stdint.h>
 
 #include <atomic>
+#include <mutex>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 
 class StatsSocketLossReporter {
 public:
