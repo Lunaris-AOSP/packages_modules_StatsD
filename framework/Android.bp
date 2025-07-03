@@ -68,6 +68,7 @@ java_sdk_library {
 
     static_libs: [
         "modules-utils-build",
+        "statsd_flags_java_lib",
     ],
 
     permitted_packages: [

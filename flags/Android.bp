@@ -43,12 +43,17 @@ cc_aconfig_library {
 }
 
 java_aconfig_library {
-    name: "statsd_flags_java_lib-host",
+    name: "statsd_flags_java_lib",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
     aconfig_declarations: "statsd_aconfig_flags",
     min_sdk_version: "30",
     host_supported: true,
     visibility: [
         "//packages/modules/StatsD:__subpackages__",
+        "//vendor:__subpackages__",
     ],
-    libs: ["fake_device_config"],
+    apex_available: [
+        "com.android.os.statsd",
+        "test_com.android.os.statsd",
+    ],
 }
