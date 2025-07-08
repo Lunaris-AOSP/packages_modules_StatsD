@@ -24,9 +24,9 @@
 #include <vector>
 
 #include "stats_statsdsocketlog.h"
-#include "utils.h"
 
-StatsSocketLossReporter::StatsSocketLossReporter() : mUid(getuid()) {
+StatsSocketLossReporter::StatsSocketLossReporter()
+    : mUid(getuid()), mCooldownTimer(kCoolDownTimerDurationNanos) {
 }
 
 StatsSocketLossReporter::~StatsSocketLossReporter() {
@@ -85,8 +85,8 @@ void StatsSocketLossReporter::dumpAtomsLossStats(bool forceDump) {
 
     const int64_t currentRealtimeTsNanos = get_elapsed_realtime_ns();
 
-    if (!forceDump && isCooldownTimerActive(currentRealtimeTsNanos)) {
-        // To avoid socket flooding with more STATS_SOCKET_LOSS_REPORTED atoms,
+    if (!forceDump && !mCooldownTimer.isExpired(currentRealtimeTsNanos)) {
+        // Early termination to avoid socket flooding with more STATS_SOCKET_LOSS_REPORTED atoms,
         // which have high probability of write failures, the cooldown timer approach is applied:
         // - start cooldown timer for 10us for every failed dump
         // - before writing STATS_SOCKET_LOSS_REPORTED do check the timestamp to keep some delay
@@ -94,7 +94,7 @@ void StatsSocketLossReporter::dumpAtomsLossStats(bool forceDump) {
     }
     // since the delay before next attempt is significantly larger than this API call
     // duration it is ok to have correctness of timestamp in a range of 10us
-    startCooldownTimer(currentRealtimeTsNanos);
+    mCooldownTimer.start(currentRealtimeTsNanos);
 
     // intention to hold mutex here during the stats_write() to avoid data copy overhead
     std::lock_guard<std::mutex> lock(mMutex);
@@ -128,12 +128,4 @@ void StatsSocketLossReporter::dumpAtomsLossStats(bool forceDump) {
         mFirstTsNanos.store(0, std::memory_order_relaxed);
         mLastTsNanos.store(0, std::memory_order_relaxed);
     }
-}
-
-void StatsSocketLossReporter::startCooldownTimer(int64_t elapsedRealtimeNanos) {
-    mCooldownTimerFinishAtNanos = elapsedRealtimeNanos + kCoolDownTimerDurationNanos;
-}
-
-bool StatsSocketLossReporter::isCooldownTimerActive(int64_t elapsedRealtimeNanos) const {
-    return mCooldownTimerFinishAtNanos > elapsedRealtimeNanos;
 }
