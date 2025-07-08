@@ -325,7 +325,7 @@ private:
     void flushRestrictedDataIfNecessaryLocked(const int64_t elapsedRealtimeNs);
 
     /* Tells LogEventFilter about atom ids to parse */
-    void updateLogEventFilterLocked() const;
+    void updateAtomIdsInUseLocked() const;
 
     bool validateAppBreadcrumbEvent(const LogEvent& event) const;
 

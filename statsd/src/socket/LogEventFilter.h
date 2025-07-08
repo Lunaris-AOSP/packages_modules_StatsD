@@ -123,7 +123,7 @@ private:
     FRIEND_TEST(LogEventFilterTest, TestMultipleConsumerEmptyFilter);
 };
 
-typedef LogEventFilterGeneric<std::unordered_set<int>> LogEventFilter;
+typedef LogEventFilterGeneric<std::unordered_set<int32_t>> LogEventFilter;
 
 }  // namespace statsd
 }  // namespace os

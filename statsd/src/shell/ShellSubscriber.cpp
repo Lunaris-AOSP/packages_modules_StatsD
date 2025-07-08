@@ -36,7 +36,7 @@ ShellSubscriber::~ShellSubscriber() {
     {
         std::lock_guard<std::mutex> lock(mMutex);
         mClientSet.clear();
-        updateLogEventFilterLocked();
+        updateAtomIdsInUseLocked();
     }
     mThreadSleepCV.notify_one();
     if (mThread.joinable()) {
@@ -78,7 +78,7 @@ bool ShellSubscriber::startNewSubscriptionLocked(unique_ptr<ShellSubscriberClien
 
     // Add new valid client to the client set
     mClientSet.insert(std::move(client));
-    updateLogEventFilterLocked();
+    updateAtomIdsInUseLocked();
 
     // Only spawn one thread to manage pulling atoms and sending
     // heartbeats.
@@ -113,7 +113,7 @@ void ShellSubscriber::pullAndSendHeartbeats() {
                 VLOG("ShellSubscriber: removing client!");
                 (*clientIt)->onUnsubscribe();
                 clientIt = mClientSet.erase(clientIt);
-                updateLogEventFilterLocked();
+                updateAtomIdsInUseLocked();
             }
         }
         if (mClientSet.empty()) {
@@ -146,7 +146,7 @@ void ShellSubscriber::onLogEvent(const LogEvent& event) {
 
             (*clientIt)->onUnsubscribe();
             clientIt = mClientSet.erase(clientIt);
-            updateLogEventFilterLocked();
+            updateAtomIdsInUseLocked();
         }
     }
 }
@@ -169,7 +169,7 @@ void ShellSubscriber::flushSubscription(const shared_ptr<IStatsSubscriptionCallb
                 // moves the iterator, skipping a value. This is fine because we do an early return
                 // before next iteration of the loop.
                 clientIt = mClientSet.erase(clientIt);
-                updateLogEventFilterLocked();
+                updateAtomIdsInUseLocked();
             }
             return;
         }
@@ -191,13 +191,13 @@ void ShellSubscriber::unsubscribe(const shared_ptr<IStatsSubscriptionCallback>& 
             // moves the iterator, skipping a value. This is fine because we do an early return
             // before next iteration of the loop.
             clientIt = mClientSet.erase(clientIt);
-            updateLogEventFilterLocked();
+            updateAtomIdsInUseLocked();
             return;
         }
     }
 }
 
-void ShellSubscriber::updateLogEventFilterLocked() const {
+void ShellSubscriber::updateAtomIdsInUseLocked() const {
     LogEventFilter::AtomIdSet allAtomIds;
     for (const auto& client : mClientSet) {
         client->addAllAtomIds(allAtomIds);
