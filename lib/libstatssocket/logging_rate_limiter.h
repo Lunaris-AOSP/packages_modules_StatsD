@@ -18,6 +18,7 @@
 
 #include <stdint.h>
 
+#include <mutex>
 #include <thread>
 #include <unordered_map>
 

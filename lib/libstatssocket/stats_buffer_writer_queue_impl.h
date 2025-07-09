@@ -19,6 +19,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <queue>
 #include <thread>
 
