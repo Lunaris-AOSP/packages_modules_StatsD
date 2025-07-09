@@ -24,6 +24,8 @@ namespace android {
 namespace os {
 namespace statsd {
 
+using std::nullopt;
+using std::optional;
 using std::set;
 using std::shared_ptr;
 using std::unordered_map;

@@ -39,9 +39,15 @@ using android::util::FIELD_TYPE_INT64;
 using android::util::FIELD_TYPE_MESSAGE;
 using android::util::FIELD_TYPE_STRING;
 using android::util::ProtoOutputStream;
+using std::max;
+using std::min;
+using std::nullopt;
+using std::optional;
+using std::pair;
 using std::shared_ptr;
 using std::string;
 using std::unordered_map;
+using std::vector;
 
 namespace android {
 namespace os {
@@ -212,7 +218,7 @@ int64_t NumericValueMetricProducer::calcPreviousBucketEndTime(const int64_t curr
 // AlarmManager might have arrived earlier and close the bucket.
 void NumericValueMetricProducer::onDataPulled(const std::vector<std::shared_ptr<LogEvent>>& allData,
                                               PullResult pullResult, int64_t originalPullTimeNs) {
-    lock_guard<mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
     if (mCondition == ConditionState::kTrue) {
         // If the pull failed, we won't be able to compute a diff.
         if (pullResult == PullResult::PULL_RESULT_FAIL) {

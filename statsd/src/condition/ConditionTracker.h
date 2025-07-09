@@ -54,7 +54,7 @@ public:
     // stack: a bit map to keep track which nodes have been visited on the stack in the recursion.
     // conditionCache: tracks initial conditions of all ConditionTrackers. returns the
     //                        current condition if called on a config update.
-    virtual optional<InvalidConfigReason> init(
+    virtual std::optional<InvalidConfigReason> init(
             const std::vector<Predicate>& allConditionConfig,
             const std::vector<sp<ConditionTracker>>& allConditionTrackers,
             const std::unordered_map<int64_t, int>& conditionIdIndexMap,
@@ -72,13 +72,13 @@ public:
     // atomMatchingTrackerMap: map of atom matcher id to index after the config update.
     // conditionTrackerMap: map of condition tracker id to index after the config update.
     // returns whether or not the update is successful.
-    virtual optional<InvalidConfigReason> onConfigUpdated(
+    virtual std::optional<InvalidConfigReason> onConfigUpdated(
             const std::vector<Predicate>& allConditionProtos, int index,
             const std::vector<sp<ConditionTracker>>& allConditionTrackers,
             const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
             const std::unordered_map<int64_t, int>& conditionTrackerMap) {
         mIndex = index;
-        return nullopt;
+        return std::nullopt;
     }
 
     // evaluate current condition given the new event.
@@ -144,9 +144,8 @@ public:
 
     virtual bool IsSimpleCondition() const = 0;
 
-    virtual bool equalOutputDimensions(
-        const std::vector<sp<ConditionTracker>>& allConditions,
-        const vector<Matcher>& dimensions) const = 0;
+    virtual bool equalOutputDimensions(const std::vector<sp<ConditionTracker>>& allConditions,
+                                       const std::vector<Matcher>& dimensions) const = 0;
 
     // Return the current condition state of the unsliced part of the condition.
     inline ConditionState getUnSlicedPartConditionState() const  {

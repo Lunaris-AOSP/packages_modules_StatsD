@@ -34,6 +34,10 @@ namespace android {
 namespace os {
 namespace statsd {
 
+using std::optional;
+using std::shared_ptr;
+using std::string;
+
 AnomalyTracker::AnomalyTracker(const Alert& alert, const ConfigKey& configKey)
         : mAlert(alert), mConfigKey(configKey), mNumOfPastBuckets(mAlert.num_buckets() - 1) {
     VLOG("AnomalyTracker() called");
@@ -267,7 +271,7 @@ std::pair<optional<InvalidConfigReason>, uint64_t> AnomalyTracker::getProtoHash(
                                                    mAlert.metric_id(), mAlert.id()),
                 0};
     }
-    return {nullopt, Hash64(serializedAlert)};
+    return {std::nullopt, Hash64(serializedAlert)};
 }
 
 void AnomalyTracker::informSubscribers(const MetricDimensionKey& key, int64_t metric_id,

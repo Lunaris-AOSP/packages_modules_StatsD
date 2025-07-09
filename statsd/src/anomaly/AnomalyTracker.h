@@ -32,9 +32,6 @@ namespace android {
 namespace os {
 namespace statsd {
 
-using std::optional;
-using std::shared_ptr;
-
 // Does NOT allow negative values.
 class AnomalyTracker : public virtual RefBase {
 public:
@@ -108,7 +105,7 @@ public:
         return mNumOfPastBuckets;
     }
 
-    std::pair<optional<InvalidConfigReason>, uint64_t> getProtoHash() const;
+    std::pair<std::optional<InvalidConfigReason>, uint64_t> getProtoHash() const;
 
     // Sets an alarm for the given timestamp.
     // Replaces previous alarm if one already exists.
@@ -132,7 +129,7 @@ public:
     // and removes it from firedAlarms. Does NOT remove the alarm from the AlarmMonitor.
     virtual void informAlarmsFired(
             int64_t timestampNs,
-            unordered_set<sp<const InternalAlarm>, SpHash<InternalAlarm>>& firedAlarms) {
+            std::unordered_set<sp<const InternalAlarm>, SpHash<InternalAlarm>>& firedAlarms) {
         return; // The base AnomalyTracker class doesn't have alarms.
     }
 
@@ -170,7 +167,7 @@ protected:
 
     // Values for each of the past mNumOfPastBuckets buckets. Always of size mNumOfPastBuckets.
     // mPastBuckets[i] can be null, meaning that no data is present in that bucket.
-    std::vector<shared_ptr<DimToValMap>> mPastBuckets;
+    std::vector<std::shared_ptr<DimToValMap>> mPastBuckets;
 
     // Cached sum over all existing buckets in mPastBuckets.
     // Its buckets never contain entries of 0.
@@ -191,11 +188,11 @@ protected:
     void advanceMostRecentBucketTo(int64_t bucketNum);
 
     // Add the information in the given bucket to mSumOverPastBuckets.
-    void addBucketToSum(const shared_ptr<DimToValMap>& bucket);
+    void addBucketToSum(const std::shared_ptr<DimToValMap>& bucket);
 
     // Subtract the information in the given bucket from mSumOverPastBuckets
     // and remove any items with value 0.
-    void subtractBucketFromSum(const shared_ptr<DimToValMap>& bucket);
+    void subtractBucketFromSum(const std::shared_ptr<DimToValMap>& bucket);
 
     // From mSumOverPastBuckets[key], subtracts bucketValue, removing it if it is now 0.
     void subtractValueFromSum(const MetricDimensionKey& key, int64_t bucketValue);

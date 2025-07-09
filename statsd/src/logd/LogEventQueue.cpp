@@ -41,7 +41,7 @@ unique_ptr<LogEvent> LogEventQueue::waitPop() {
 LogEventQueue::Result LogEventQueue::push(unique_ptr<LogEvent> item) {
     Result result;
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        std::lock_guard lock(mMutex);
         if (mQueue.size() < mQueueLimit) {
             mQueue.push(std::move(item));
             result.success = true;

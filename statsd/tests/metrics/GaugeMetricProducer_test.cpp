@@ -31,10 +31,12 @@
 
 using namespace testing;
 using android::sp;
+
+using std::make_shared;
+using std::nullopt;
 using std::set;
 using std::unordered_map;
 using std::vector;
-using std::make_shared;
 
 #ifdef __ANDROID__
 

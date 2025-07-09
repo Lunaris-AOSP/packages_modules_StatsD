@@ -23,6 +23,7 @@ namespace android {
 namespace os {
 namespace statsd {
 
+using std::nullopt;
 using std::shared_ptr;
 using std::unordered_map;
 using std::vector;
@@ -65,7 +66,7 @@ MatcherInitResult SimpleAtomMatchingTracker::init(
     return result;
 }
 
-optional<InvalidConfigReason> SimpleAtomMatchingTracker::onConfigUpdated(
+std::optional<InvalidConfigReason> SimpleAtomMatchingTracker::onConfigUpdated(
         const AtomMatcher& matcher, const unordered_map<int64_t, int>& atomMatchingTrackerMap) {
     // Do not need to update mMatcher since the matcher must be identical across the update.
     if (!mInitialized) {

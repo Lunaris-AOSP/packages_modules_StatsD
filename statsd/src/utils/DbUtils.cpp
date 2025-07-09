@@ -41,6 +41,9 @@ using ::android::os::statsd::STRING;
 using base::GetProperty;
 using base::StringPrintf;
 
+using std::string;
+using std::vector;
+
 const string TABLE_NAME_PREFIX = "metric_";
 const string COLUMN_NAME_ATOM_TAG = "atomId";
 const string COLUMN_NAME_EVENT_ELAPSED_CLOCK_NS = "elapsedTimestampNs";

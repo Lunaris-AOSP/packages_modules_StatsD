@@ -42,6 +42,7 @@ using std::map;
 using std::nullopt;
 using std::optional;
 using std::set;
+using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
@@ -143,7 +144,7 @@ struct DimLimitTestCase {
     int newLimit;
     int actualLimit;
 
-    friend void PrintTo(const DimLimitTestCase& testCase, ostream* os) {
+    friend void PrintTo(const DimLimitTestCase& testCase, std::ostream* os) {
         *os << testCase.oldLimit << "To" << testCase.newLimit;
     }
 };

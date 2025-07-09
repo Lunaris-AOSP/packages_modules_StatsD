@@ -108,12 +108,12 @@ private:
 
     int64_t pullIfNeeded(int64_t nowSecs, int64_t nowMillis, int64_t nowNanos);
 
-    void writePulledAtomsLocked(const vector<std::shared_ptr<LogEvent>>& data,
+    void writePulledAtomsLocked(const std::vector<std::shared_ptr<LogEvent>>& data,
                                 const SimpleAtomMatcher& matcher);
 
     void attemptWriteToPipeLocked();
 
-    void getUidsForPullAtom(vector<int32_t>* uids, const PullInfo& pullInfo);
+    void getUidsForPullAtom(std::vector<int32_t>* uids, const PullInfo& pullInfo);
 
     void flushProtoIfNeeded();
 

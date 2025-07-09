@@ -51,7 +51,7 @@ bool BufferWriterQueue::write(const uint8_t* buffer, size_t size, uint32_t atomI
 }
 
 size_t BufferWriterQueue::getQueueSize() const {
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
     return mCmdQueue.size();
 }
 
@@ -67,7 +67,7 @@ void BufferWriterQueue::startWorkerThread() {
 bool BufferWriterQueue::pushToQueue(const Cmd& cmd) {
     // start worker thread only when there is an actual data to be processed
     startWorkerThread();
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
     if (mCmdQueue.size() >= kQueueMaxSizeLimit) {
         // TODO (b/258003151): add logging info about internal queue overflow with appropriate
         // error code
@@ -102,7 +102,7 @@ void BufferWriterQueue::terminate() {
 }
 
 void BufferWriterQueue::drainQueue() {
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
     while (!mCmdQueue.empty()) {
         free(mCmdQueue.front().buffer);
         mCmdQueue.pop();
@@ -135,7 +135,7 @@ void BufferWriterQueue::processCommands() {
             // call free() explicitly here to free memory before the mutex lock
             free(cmd.buffer);
             {
-                std::lock_guard<std::mutex> lock(mMutex);
+                std::lock_guard lock(mMutex);
                 // this will lead to Cmd destructor call which will be no-op since now the
                 // buffer is NULL
                 mCmdQueue.pop();

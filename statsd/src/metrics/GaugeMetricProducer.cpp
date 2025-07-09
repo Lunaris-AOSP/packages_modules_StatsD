@@ -23,6 +23,10 @@
 #include "metrics/parsing_utils/metrics_manager_util.h"
 #include "stats_log_util.h"
 
+namespace android {
+namespace os {
+namespace statsd {
+
 using android::util::FIELD_COUNT_REPEATED;
 using android::util::FIELD_TYPE_BOOL;
 using android::util::FIELD_TYPE_FLOAT;
@@ -31,16 +35,13 @@ using android::util::FIELD_TYPE_INT64;
 using android::util::FIELD_TYPE_MESSAGE;
 using android::util::FIELD_TYPE_STRING;
 using android::util::ProtoOutputStream;
+using std::make_shared;
 using std::map;
+using std::optional;
+using std::shared_ptr;
 using std::string;
 using std::unordered_map;
 using std::vector;
-using std::make_shared;
-using std::shared_ptr;
-
-namespace android {
-namespace os {
-namespace statsd {
 
 // for StatsLogReport
 const int FIELD_ID_ID = 1;
@@ -231,7 +232,7 @@ optional<InvalidConfigReason> GaugeMetricProducer::onConfigUpdatedLocked(
     if (mCondition == ConditionState::kTrue && mIsActive && mIsPulled && isRandomNSamples()) {
         pullAndMatchEventsLocked(mCurrentBucketStartTimeNs);
     }
-    return nullopt;
+    return std::nullopt;
 }
 
 void GaugeMetricProducer::onStateChanged(const int64_t eventTimeNs, const int32_t atomId,
@@ -535,7 +536,7 @@ vector<FieldValue> GaugeMetricProducer::getGaugeFields(const LogEvent& event) {
 
 void GaugeMetricProducer::onDataPulled(const std::vector<std::shared_ptr<LogEvent>>& allData,
                                        PullResult pullResult, int64_t originalPullTimeNs) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
     if (pullResult != PullResult::PULL_RESULT_SUCCESS || allData.size() == 0) {
         return;
     }

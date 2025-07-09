@@ -33,7 +33,7 @@ namespace os {
 namespace statsd {
 
 struct MatcherInitResult {
-    optional<InvalidConfigReason> invalidConfigReason;
+    std::optional<InvalidConfigReason> invalidConfigReason;
     bool hasStringTransformation;
 };
 
@@ -63,7 +63,7 @@ public:
     // This matcher and all of its children are guaranteed to be preserved across the update.
     // matcher: the AtomMatcher proto from the config.
     // atomMatchingTrackerMap: map from matcher id to index in mAllAtomMatchingTrackers
-    virtual optional<InvalidConfigReason> onConfigUpdated(
+    virtual std::optional<InvalidConfigReason> onConfigUpdated(
             const AtomMatcher& matcher,
             const std::unordered_map<int64_t, int>& atomMatchingTrackerMap) = 0;
 

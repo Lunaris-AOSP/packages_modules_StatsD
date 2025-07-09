@@ -28,6 +28,8 @@ namespace android {
 namespace os {
 namespace statsd {
 
+using std::string;
+
 StateManager::StateManager()
     : mAllowedPkg({
               "com.android.systemui",
