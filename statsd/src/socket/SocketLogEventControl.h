@@ -16,13 +16,17 @@
 
 #pragma once
 
+#include <StatsdLoggingControl.h>
 #include <com_android_os_statsd_flags.h>
 #include <gtest/gtest_prod.h>
 
 #include <mutex>
+#include <vector>
 
 #include "LogEventFilterUtils.h"
 #include "socket/AtomsInUseChangeListener.h"
+#include "socket/AtomsInUseListProducer.h"
+#include "stats_util.h"
 
 namespace android {
 namespace os {
@@ -35,47 +39,63 @@ namespace flags = com::android::os::statsd::flags;
  */
 class SocketLogEventControl : public AtomsInUseChangeListener {
 public:
+    SocketLogEventControl(std::string fileName = kAtomIdsFileName,
+                          std::string versionPropertyName = kAtomIdsVersionName)
+        : mAtomsInUseListProducer(fileName, versionPropertyName) {
+    }
+
     virtual ~SocketLogEventControl() = default;
 
     void setControlEnabled(bool isEnabled) {
-        if (!isActive()) {
+        if (!isSupported()) {
             return;
         }
 
-        if (isEnabled) {
-            std::lock_guard lock(mTagIdsMutex);
-            setLoggingConfig(mAtomIdSetManager.getAtomIds());
+        std::lock_guard lock(mTagIdsMutex);
+        mIsEnabled = isEnabled;
+        if (mIsEnabled) {
+            setLoggingConfigLocked(mAtomIdSetManager.getAtomIds());
         } else {
             // to allow clients to log any atom
-            resetConfig();
+            resetConfigLocked();
         }
     }
 
     void setAtomIds(AtomIdSet tagIds, ConsumerId consumer) override {
-        if (!isActive()) {
+        if (!isSupported()) {
             return;
         }
 
         std::lock_guard lock(mTagIdsMutex);
         mAtomIdSetManager.setAtomIds(tagIds, consumer);
-        setLoggingConfig(mAtomIdSetManager.getAtomIds());
+        if (mIsEnabled) {
+            setLoggingConfigLocked(mAtomIdSetManager.getAtomIds());
+        }
+    }
+
+    static bool isSupported() {
+        static const bool featureActive = isAtLeastB() && flags::logging_control_enabled();
+        return featureActive;
     }
 
 private:
     mutable std::mutex mTagIdsMutex;
     mutable AtomIdSetManager mAtomIdSetManager;
+    bool mIsEnabled = false;
+    AtomsInUseListProducer mAtomsInUseListProducer;
 
-    void setLoggingConfig(const AtomIdSet& atomsInUse) {
-        // TODO (b/407064406): sets system property & creates atom list file
+    void setLoggingConfigLocked(const AtomIdSet& atomsInUse) {
+        // sets system property & creates atom list file
+        const std::vector<int32_t> atomIds{atomsInUse.begin(), atomsInUse.end()};
+        if (!mAtomsInUseListProducer.setAtomsIds(atomIds)) {
+            // if for some reason up to date list was not set - disable the logging control
+            mAtomsInUseListProducer.reset();
+        }
     }
 
-    void resetConfig() {
-        // TODO: resets system property & removes atom list file
-    }
-
-    static bool isActive() {
-        static const bool featureActive = isAtLeastB() && flags::logging_control_enabled();
-        return featureActive;
+    void resetConfigLocked() {
+        // resets system property & removes atom list file
+        mAtomsInUseListProducer.reset();
     }
 };
 
