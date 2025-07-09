@@ -20,6 +20,7 @@
 #include "StatsLogProcessor.h"
 
 #include <android-base/file.h>
+#include <android-base/stringprintf.h>
 #include <cutils/multiuser.h>
 #include <src/active_config_list.pb.h>
 #include <src/experiment_ids.pb.h>
@@ -27,7 +28,6 @@
 #include <random>
 
 #include "StatsService.h"
-#include "android-base/stringprintf.h"
 #include "external/StatsPullerManager.h"
 #include "flags/FlagProvider.h"
 #include "guardrail/StatsdStats.h"

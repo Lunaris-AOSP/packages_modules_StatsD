@@ -20,11 +20,11 @@
 
 #include "utils/DbUtils.h"
 
+#include <android-base/properties.h>
+#include <android-base/stringprintf.h>
 #include <android/api-level.h>
 
 #include "FieldValue.h"
-#include "android-base/properties.h"
-#include "android-base/stringprintf.h"
 #include "stats_log_util.h"
 #include "storage/StorageManager.h"
 

@@ -20,12 +20,12 @@
 #include "storage/StorageManager.h"
 
 #include <android-base/file.h>
+#include <android-base/stringprintf.h>
 #include <private/android_filesystem_config.h>
 #include <sys/stat.h>
 
 #include <fstream>
 
-#include "android-base/stringprintf.h"
 #include "guardrail/StatsdStats.h"
 #include "stats_log_util.h"
 #include "utils/DbUtils.h"

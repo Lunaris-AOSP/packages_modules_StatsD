@@ -20,6 +20,7 @@
 #include "StatsService.h"
 
 #include <android-base/file.h>
+#include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <android/binder_ibinder_platform.h>
 #include <cutils/multiuser.h>
@@ -34,7 +35,6 @@
 #include <unistd.h>
 #include <utils/String16.h>
 
-#include "android-base/stringprintf.h"
 #include "config/ConfigKey.h"
 #include "config/ConfigManager.h"
 #include "flags/FlagProvider.h"
