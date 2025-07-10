@@ -57,8 +57,8 @@ namespace statsd {
 class ShellSubscriber : public virtual RefBase {
 public:
     ShellSubscriber(const sp<UidMap>& uidMap, const sp<StatsPullerManager>& pullerMgr,
-                    const std::shared_ptr<LogEventFilter>& logEventFilter)
-        : mUidMap(uidMap), mPullerMgr(pullerMgr), mLogEventFilter(logEventFilter){};
+                    std::shared_ptr<LogEventFilter> logEventFilter)
+        : mUidMap(uidMap), mPullerMgr(pullerMgr), mLogEventFilter(logEventFilter) {};
 
     ~ShellSubscriber();
 
@@ -91,7 +91,7 @@ private:
     void pullAndSendHeartbeats();
 
     /* Tells LogEventFilter about atom ids to parse */
-    void updateLogEventFilterLocked() const;
+    void updateAtomIdsInUseLocked() const;
 
     sp<UidMap> mUidMap;
 

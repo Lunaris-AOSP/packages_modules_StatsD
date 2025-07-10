@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <android-base/stringprintf.h>
 #include <gtest/gtest.h>
 
 #include <vector>
 
-#include "android-base/stringprintf.h"
 #include "flags/FlagProvider.h"
 #include "src/StatsLogProcessor.h"
 #include "src/state/StateTracker.h"

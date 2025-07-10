@@ -20,6 +20,7 @@
 #include "StatsLogProcessor.h"
 
 #include <android-base/file.h>
+#include <android-base/stringprintf.h>
 #include <cutils/multiuser.h>
 #include <src/active_config_list.pb.h>
 #include <src/experiment_ids.pb.h>
@@ -27,7 +28,6 @@
 #include <random>
 
 #include "StatsService.h"
-#include "android-base/stringprintf.h"
 #include "external/StatsPullerManager.h"
 #include "flags/FlagProvider.h"
 #include "guardrail/StatsdStats.h"
@@ -136,7 +136,7 @@ StatsLogProcessor::StatsLogProcessor(
     mPullerManager->ForceClearPullerCache();
     StateManager::getInstance().updateLogSources(uidMap);
     // It is safe called locked version at constructor - no concurrent access possible
-    updateLogEventFilterLocked();
+    updateAtomIdsInUseLocked();
 }
 
 StatsLogProcessor::~StatsLogProcessor() {
@@ -660,7 +660,7 @@ void StatsLogProcessor::OnConfigUpdatedLocked(const int64_t timestampNs, const C
         mUidMap->OnConfigRemoved(key);
     }
 
-    updateLogEventFilterLocked();
+    updateAtomIdsInUseLocked();
 }
 
 size_t StatsLogProcessor::GetMetricsSize(const ConfigKey& key) const {
@@ -929,7 +929,7 @@ void StatsLogProcessor::OnConfigRemoved(const ConfigKey& key) {
         mPullerManager->ForceClearPullerCache();
     }
 
-    updateLogEventFilterLocked();
+    updateAtomIdsInUseLocked();
 }
 
 // TODO(b/267501143): Add unit tests when metric producer is ready
@@ -1543,14 +1543,13 @@ LogEventFilter::AtomIdSet StatsLogProcessor::getDefaultAtomIdSet() {
     return allAtomIds;
 }
 
-void StatsLogProcessor::updateLogEventFilterLocked() const {
-    VLOG("StatsLogProcessor: Updating allAtomIds at %lld", (long long)getElapsedRealtimeNs());
+void StatsLogProcessor::updateAtomIdsInUseLocked() const {
+    TIME_CALL_DEBUG();
     LogEventFilter::AtomIdSet allAtomIds = getDefaultAtomIdSet();
     for (const auto& metricsManager : mMetricsManagers) {
         metricsManager.second->addAllAtomIds(allAtomIds);
     }
     StateManager::getInstance().addAllAtomIds(allAtomIds);
-    VLOG("StatsLogProcessor: Updating allAtomIds done. Total atoms %d", (int)allAtomIds.size());
 #ifdef STATSD_DEBUG
     for (auto atomId : allAtomIds) {
         VLOG("Atom in use %d", atomId);

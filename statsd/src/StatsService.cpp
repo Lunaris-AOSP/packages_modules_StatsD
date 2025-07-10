@@ -20,6 +20,7 @@
 #include "StatsService.h"
 
 #include <android-base/file.h>
+#include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <android/binder_ibinder_platform.h>
 #include <cutils/multiuser.h>
@@ -34,7 +35,6 @@
 #include <unistd.h>
 #include <utils/String16.h>
 
-#include "android-base/stringprintf.h"
 #include "config/ConfigKey.h"
 #include "config/ConfigManager.h"
 #include "flags/FlagProvider.h"
@@ -125,7 +125,7 @@ Status checkSid(const char* expectedSid) {
     }
 
 StatsService::StatsService(const sp<UidMap>& uidMap, shared_ptr<LogEventQueue> queue,
-                           const std::shared_ptr<LogEventFilter>& logEventFilter)
+                           shared_ptr<LogEventFilter> logEventFilter)
     : mUidMap(uidMap),
       mAnomalyAlarmMonitor(new AlarmMonitor(
               MIN_DIFF_TO_UPDATE_REGISTERED_ALARM_SECS,

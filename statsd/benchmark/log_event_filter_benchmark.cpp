@@ -108,7 +108,7 @@ BENCHMARK(BM_LogEventFilterUnorderedSet2Consumers);
 
 static void BM_LogEventFilterSet(benchmark::State& state) {
     while (state.KeepRunning()) {
-        LogEventFilterGeneric<std::set<int>> eventFilter;
+        LogEventFilterGeneric<std::set<int32_t>> eventFilter;
         // populate
         eventFilter.setAtomIds(kAtomIdsSet, nullptr);
         // many fetches
@@ -121,7 +121,7 @@ BENCHMARK(BM_LogEventFilterSet);
 
 static void BM_LogEventFilterSet2Consumers(benchmark::State& state) {
     while (state.KeepRunning()) {
-        LogEventFilterGeneric<std::set<int>> eventFilter;
+        LogEventFilterGeneric<std::set<int32_t>> eventFilter;
         // populate
         eventFilter.setAtomIds(kAtomIdsSet, &kAtomIdsSet);
         eventFilter.setAtomIds(kAtomIdsSet2, &kAtomIdsSet2);

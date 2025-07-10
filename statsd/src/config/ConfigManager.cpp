@@ -18,16 +18,16 @@
 #include "Log.h"
 
 #include "config/ConfigManager.h"
-#include "storage/StorageManager.h"
+
+#include <android-base/stringprintf.h>
+#include <stdio.h>
+
+#include <vector>
 
 #include "guardrail/StatsdStats.h"
 #include "stats_log_util.h"
 #include "stats_util.h"
-#include "stats_log_util.h"
-
-#include <stdio.h>
-#include <vector>
-#include "android-base/stringprintf.h"
+#include "storage/StorageManager.h"
 
 namespace android {
 namespace os {
