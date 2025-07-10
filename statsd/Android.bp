@@ -646,6 +646,10 @@ cc_fuzz {
             "singhtejinder@google.com",
             "sharaienko@google.com",
         ],
+        vector: "local_no_privileges_required",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
     },
     proto: {
         type: "lite",
@@ -672,6 +676,10 @@ cc_fuzz {
             "singhtejinder@google.com",
             "sharaienko@google.com",
         ],
+        vector: "local_no_privileges_required",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
     },
     proto: {
         type: "lite",
