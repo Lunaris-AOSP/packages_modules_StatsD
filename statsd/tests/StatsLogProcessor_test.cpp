@@ -1677,7 +1677,7 @@ TEST(StatsLogProcessorTest, TestActivationsPersistAcrossSystemServerRestart) {
     const shared_ptr<StatsService> service = SharedRefBase::make<StatsService>(
             uidMap, /* queue */ nullptr, std::make_shared<LogEventFilter>());
     string serialized = config1.SerializeAsString();
-    service->addConfigurationChecked(uid, configId, {serialized.begin(), serialized.end()});
+    service->addConfiguration(configId, {serialized.begin(), serialized.end()}, uid);
 
     // Make sure the config is stored on disk. Otherwise, we will not reset on system server death.
     StatsdConfig tmpConfig;

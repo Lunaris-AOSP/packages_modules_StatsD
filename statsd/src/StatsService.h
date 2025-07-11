@@ -112,11 +112,18 @@ public:
     virtual Status getMetadata(vector<uint8_t>* output) override;
 
     /**
-     * Binder call to let clients send a configuration and indicate they're interested when they
-     * should requestData for this configuration.
+     * Binder call to let clients send a configuration as a byte array and indicate they're
+     * interested when they should requestData for this configuration.
      */
     virtual Status addConfiguration(int64_t key, const vector<uint8_t>& config,
                                     const int32_t callingUid) override;
+
+    /**
+     * Binder call to let clients send a configuration through a file descriptor and indicate
+     * they're interested when they should requestData for this configuration.
+     */
+    virtual Status addConfigurationFd(int64_t key, const ScopedFileDescriptor& configFd,
+                                      const int32_t callingUid) override;
 
     /**
      * Binder call to let clients register the data fetch operation for a configuration.
@@ -374,9 +381,9 @@ private:
     bool getUidFromString(const char* uidString, int32_t& uid);
 
     /**
-     * Adds a configuration after checking permissions and obtaining UID from binder call.
+     * Adds a configuration to statsd.
      */
-    bool addConfigurationChecked(int uid, int64_t key, const vector<uint8_t>& config);
+    void addConfigurationChecked(int64_t key, int32_t callingUid, const StatsdConfig& cfg);
 
     /**
      * Update a configuration.
@@ -481,9 +488,9 @@ private:
     friend class RestrictedConfigE2ETest;
 
     FRIEND_TEST(StatsLogProcessorTest, TestActivationsPersistAcrossSystemServerRestart);
-    FRIEND_TEST(StatsServiceTest, TestAddConfig_simple);
-    FRIEND_TEST(StatsServiceTest, TestAddConfig_empty);
-    FRIEND_TEST(StatsServiceTest, TestAddConfig_invalid);
+    FRIEND_TEST(StatsServiceTestAddConfig, TestAddConfig_simple);
+    FRIEND_TEST(StatsServiceTestAddConfig, TestAddConfig_empty);
+    FRIEND_TEST(StatsServiceTestAddConfig, TestAddConfig_invalid);
     FRIEND_TEST(StatsServiceTest, TestGetUidFromArgs);
     FRIEND_TEST(PartialBucketE2eTest, TestCountMetricNoSplitOnNewApp);
     FRIEND_TEST(PartialBucketE2eTest, TestCountMetricSplitOnBoot);

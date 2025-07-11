@@ -29,6 +29,7 @@ aconfig_declarations {
         "libstatspull_flags.aconfig",
         "libstatssocket_flags.aconfig",
         "statsd_flags.aconfig",
+        "stats_manager_flags.aconfig",
     ],
 }
 
