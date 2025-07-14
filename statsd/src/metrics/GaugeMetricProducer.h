@@ -259,6 +259,7 @@ private:
 
     FRIEND_TEST(GaugeMetricProducerTest_PartialBucket, TestPushedEvents);
     FRIEND_TEST(GaugeMetricProducerTest_PartialBucket, TestPulled);
+    FRIEND_TEST(GaugeMetricProducerTest_PulledAnomaly, TestPulledEventsAnomalyDetection);
 
     FRIEND_TEST(ConfigUpdateTest, TestUpdateGaugeMetrics);
 

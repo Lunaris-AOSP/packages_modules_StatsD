@@ -60,24 +60,24 @@ public:
     // given bucketValue. If the bucket does not exist, it will be created.
     // Also, advances to bucketNum (if not in the past), effectively filling any intervening
     // buckets with 0s.
-    void addPastBucket(const MetricDimensionKey& key, int64_t bucketValue, int64_t bucketNum);
+    void addPastBucket(const MetricDimensionKey& key, double bucketValue, int64_t bucketNum);
 
     // Returns true if, based on past buckets plus the new currentBucketValue (which generally
     // represents the partially-filled current bucket), an anomaly has happened.
     // Also advances to currBucketNum-1.
     bool detectAnomaly(int64_t currBucketNum, const MetricDimensionKey& key,
-                       int64_t currentBucketValue);
+                       double currentBucketValue);
 
     // Informs incidentd about the detected alert.
     void declareAnomaly(int64_t timestampNs, int64_t metricId, const MetricDimensionKey& key,
-                        int64_t metricValue);
+                        double metricValue);
 
     // Detects if, based on past buckets plus the new currentBucketValue (which generally
     // represents the partially-filled current bucket), an anomaly has happened, and if so,
     // declares an anomaly and informs relevant subscribers.
     // Also advances to currBucketNum-1.
     void detectAndDeclareAnomaly(int64_t timestampNs, int64_t currBucketNum, int64_t metricId,
-                                 const MetricDimensionKey& key, int64_t currentBucketValue);
+                                 const MetricDimensionKey& key, double currentBucketValue);
 
     // Init the AlarmMonitor which is shared across anomaly trackers.
     virtual void setAlarmMonitor(const sp<AlarmMonitor>& alarmMonitor) {
@@ -85,13 +85,13 @@ public:
     }
 
     // Returns the sum of all past bucket values for the given dimension key.
-    int64_t getSumOverPastBuckets(const MetricDimensionKey& key) const;
+    double getSumOverPastBuckets(const MetricDimensionKey& key) const;
 
     // Returns the value for a past bucket, or 0 if that bucket doesn't exist.
-    int64_t getPastBucketValue(const MetricDimensionKey& key, int64_t bucketNum) const;
+    double getPastBucketValue(const MetricDimensionKey& key, int64_t bucketNum) const;
 
     // Returns the anomaly threshold set in the configuration.
-    inline int64_t getAnomalyThreshold() const {
+    inline double getAnomalyThreshold() const {
         return mAlert.trigger_if_sum_gt();
     }
 
@@ -198,7 +198,7 @@ protected:
     void subtractBucketFromSum(const shared_ptr<DimToValMap>& bucket);
 
     // From mSumOverPastBuckets[key], subtracts bucketValue, removing it if it is now 0.
-    void subtractValueFromSum(const MetricDimensionKey& key, int64_t bucketValue);
+    void subtractValueFromSum(const MetricDimensionKey& key, double bucketValue);
 
     // Returns true if in the refractory period, else false.
     bool isInRefractoryPeriod(int64_t timestampNs, const MetricDimensionKey& key) const;
@@ -211,7 +211,7 @@ protected:
     virtual void resetStorage();
 
     // Informs the subscribers (incidentd, perfetto, broadcasts, etc) that an anomaly has occurred.
-    void informSubscribers(const MetricDimensionKey& key, int64_t metricId, int64_t metricValue);
+    void informSubscribers(const MetricDimensionKey& key, int64_t metricId, double metricValue);
 
     FRIEND_TEST(AnomalyTrackerTest, TestConsecutiveBuckets);
     FRIEND_TEST(AnomalyTrackerTest, TestSparseBuckets);

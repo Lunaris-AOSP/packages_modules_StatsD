@@ -628,8 +628,7 @@ bool NumericValueMetricProducer::aggregateFields(const int64_t eventTimeNs,
     // Only trigger the tracker if all intervals are correct and we have not skipped the bucket due
     // to MULTIPLE_BUCKETS_SKIPPED.
     if (useAnomalyDetection && !multipleBucketsSkipped(calcBucketsForwardCount(eventTimeNs))) {
-        // TODO: propgate proper values down stream when anomaly support doubles
-        long wholeBucketVal = intervals[0].aggregate.getValueOrDefault<int64_t>(0);
+        double wholeBucketVal = toDouble(intervals[0].aggregate);
         auto prev = mCurrentFullBucket.find(eventKey);
         if (prev != mCurrentFullBucket.end()) {
             wholeBucketVal += prev->second;
@@ -708,11 +707,9 @@ void NumericValueMetricProducer::appendToFullBucket(const bool isFullBucketReach
                     currentBucket.intervals.empty()) {
                     continue;
                 }
-                // TODO: fix this when anomaly can accept double values
                 auto& interval = currentBucket.intervals[0];
                 if (interval.hasValue()) {
-                    mCurrentFullBucket[metricDimensionKey] +=
-                            interval.aggregate.getValueOrDefault<int64_t>(0);
+                    mCurrentFullBucket[metricDimensionKey] += toDouble(interval.aggregate);
                 }
             }
             for (const auto& [metricDimensionKey, value] : mCurrentFullBucket) {
@@ -728,12 +725,10 @@ void NumericValueMetricProducer::appendToFullBucket(const bool isFullBucketReach
             for (const auto& [metricDimensionKey, currentBucket] : mCurrentSlicedBucket) {
                 for (auto& tracker : mAnomalyTrackers) {
                     if (tracker != nullptr && !currentBucket.intervals.empty()) {
-                        // TODO: fix this when anomaly can accept double values
                         auto& interval = currentBucket.intervals[0];
                         if (interval.hasValue()) {
-                            const int64_t longVal =
-                                    interval.aggregate.getValueOrDefault<int64_t>(0);
-                            tracker->addPastBucket(metricDimensionKey, longVal, mCurrentBucketNum);
+                            tracker->addPastBucket(metricDimensionKey, toDouble(interval.aggregate),
+                                                   mCurrentBucketNum);
                         }
                     }
                 }

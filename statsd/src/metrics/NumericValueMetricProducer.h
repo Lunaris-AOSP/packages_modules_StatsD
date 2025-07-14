@@ -201,7 +201,7 @@ private:
     const std::vector<Matcher> mDedupedFieldMatchers;
 
     // For anomaly detection.
-    std::unordered_map<MetricDimensionKey, int64_t> mCurrentFullBucket;
+    std::unordered_map<MetricDimensionKey, double> mCurrentFullBucket;
 
     const std::vector<std::optional<const BinStarts>> mBinStartsList;
 
