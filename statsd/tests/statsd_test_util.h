@@ -171,6 +171,22 @@ protected:
                                    bool include_current = false);
 };
 
+class WaitableEvent {
+public:
+    WaitableEvent() = default;
+
+    void Notify();
+
+    bool WaitForNotification();
+
+    bool WaitForNotificationWithTimeoutMillis(int millis);
+
+private:
+    std::mutex m_;
+    std::condition_variable cv_;
+    bool notified_ = false;
+};
+
 static void assertConditionTimer(const ConditionTimer& conditionTimer, bool condition,
                                  int64_t timerNs, int64_t lastConditionTrueTimestampNs,
                                  int64_t currentBucketStartDelayNs = 0) {
