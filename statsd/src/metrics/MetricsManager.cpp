@@ -966,7 +966,7 @@ vector<int64_t> MetricsManager::getAllMetricIds() const {
     return metricIds;
 }
 
-void MetricsManager::addAllAtomIds(LogEventFilter::AtomIdSet& allIds) const {
+void MetricsManager::addAllAtomIds(AtomsInUseChangeListener::AtomIdSet& allIds) const {
     for (const auto& [atomId, _] : mTagIdsToMatchersMap) {
         allIds.insert(atomId);
     }

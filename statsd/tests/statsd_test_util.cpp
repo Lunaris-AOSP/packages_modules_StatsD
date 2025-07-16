@@ -1616,14 +1616,14 @@ sp<NumericValueMetricProducer> createNumericValueMetricProducer(
             {dimensionSoftLimit, dimensionHardLimit}, provider);
 }
 
-LogEventFilter::AtomIdSet CreateAtomIdSetDefault() {
-    LogEventFilter::AtomIdSet resultList(StatsLogProcessor::getDefaultAtomIdSet());
+AtomsInUseChangeListener::AtomIdSet CreateAtomIdSetDefault() {
+    AtomsInUseChangeListener::AtomIdSet resultList(StatsLogProcessor::getDefaultAtomIdSet());
     StateManager::getInstance().addAllAtomIds(resultList);
     return resultList;
 }
 
-LogEventFilter::AtomIdSet CreateAtomIdSetFromConfig(const StatsdConfig& config) {
-    LogEventFilter::AtomIdSet resultList(StatsLogProcessor::getDefaultAtomIdSet());
+AtomsInUseChangeListener::AtomIdSet CreateAtomIdSetFromConfig(const StatsdConfig& config) {
+    AtomsInUseChangeListener::AtomIdSet resultList(StatsLogProcessor::getDefaultAtomIdSet());
 
     // Parse the config for atom ids. A combination atom matcher is a combination of (in the end)
     // simple atom matchers. So by adding all the atoms from the simple atom matchers

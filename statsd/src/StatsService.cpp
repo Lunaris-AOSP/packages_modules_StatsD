@@ -167,7 +167,9 @@ StatsService::StatsService(const sp<UidMap>& uidMap, shared_ptr<LogEventQueue> q
       mBootCompleteTrigger({kBootCompleteTag, kUidMapReceivedTag, kAllPullersRegisteredTag},
                            [this]() { onStatsdInitCompleted(kStatsdInitDelaySecs); }),
       mStatsCompanionServiceDeathRecipient(
-              AIBinder_DeathRecipient_new(StatsService::statsCompanionServiceDied)) {
+              AIBinder_DeathRecipient_new(StatsService::statsCompanionServiceDied)),
+      mAtomsInUseChangeDispatcher(std::make_shared<AtomsInUseChangeDispatcher>()) {
+    mAtomsInUseChangeDispatcher->addListener(mLogEventFilter);
     mPullerManager = new StatsPullerManager();
     StatsPuller::SetUidMap(mUidMap);
     mConfigManager = new ConfigManager();
@@ -231,7 +233,7 @@ StatsService::StatsService(const sp<UidMap>& uidMap, shared_ptr<LogEventQueue> q
                 mConfigManager->SendRestrictedMetricsBroadcast(configPackages, key.GetId(),
                                                                delegateUids, restrictedMetrics);
             },
-            logEventFilter);
+            mAtomsInUseChangeDispatcher);
 
     mUidMap->setListener(mProcessor);
     mConfigManager->AddListener(mProcessor);
@@ -952,7 +954,7 @@ status_t StatsService::cmd_clear_puller_cache(int out) {
     }
 }
 
-status_t StatsService::cmd_print_logs(int out, const Vector<String8>& args) {
+status_t StatsService::cmd_print_logs(int /*out*/, const Vector<String8>& args) {
     Status status = checkUid(AID_ROOT);
     if (!status.isOk()) {
         return PERMISSION_DENIED;
@@ -965,6 +967,9 @@ status_t StatsService::cmd_print_logs(int out, const Vector<String8>& args) {
         enabled = atoi(args[1].c_str()) != 0;
     }
     mProcessor->setPrintLogs(enabled);
+    // Turning on print logs turns off pushed event filtering to enforce
+    // complete log event buffer parsing
+    mLogEventFilter->setFilteringEnabled(!enabled);
     return NO_ERROR;
 }
 
@@ -1586,7 +1591,8 @@ Status StatsService::flushSubscription(const shared_ptr<IStatsSubscriptionCallba
 void StatsService::initShellSubscriber() {
     std::lock_guard lock(mShellSubscriberMutex);
     if (mShellSubscriber == nullptr) {
-        mShellSubscriber = new ShellSubscriber(mUidMap, mPullerManager, mLogEventFilter);
+        mShellSubscriber =
+                new ShellSubscriber(mUidMap, mPullerManager, mAtomsInUseChangeDispatcher);
     }
 }
 

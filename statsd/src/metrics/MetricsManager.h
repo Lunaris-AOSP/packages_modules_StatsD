@@ -181,7 +181,7 @@ public:
     std::vector<int64_t> getAllMetricIds() const;
 
     // Adds all atom ids referenced by matchers in the MetricsManager's config
-    void addAllAtomIds(LogEventFilter::AtomIdSet& allIds) const;
+    void addAllAtomIds(AtomsInUseChangeListener::AtomIdSet& allIds) const;
 
     // Gets the memory limit for the MetricsManager's config
     inline size_t getMaxMetricsBytes() const {

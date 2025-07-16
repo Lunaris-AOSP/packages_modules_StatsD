@@ -24,6 +24,7 @@
 #include <unordered_set>
 
 #include "LogEventFilterUtils.h"
+#include "socket/AtomsInUseChangeListener.h"
 
 namespace android {
 namespace os {
@@ -34,7 +35,8 @@ namespace statsd {
  * Maintains thread-local copy for fast search operations without holding a mutex
  * on each query
  */
-class LogEventFilter {
+
+class LogEventFilter : public AtomsInUseChangeListener {
 public:
     virtual ~LogEventFilter() = default;
 
@@ -54,7 +56,7 @@ public:
      * @param atomId
      * @return true if atom is used by any of consumer or filtering is disabled
      */
-    virtual bool isAtomInUse(int atomId) const {
+    bool isAtomInUse(int atomId) const {
         if (!mLogsFilteringEnabled) {
             return true;
         }
@@ -71,16 +73,13 @@ public:
         return isAtomInSet(mLocalTagIds, atomId);
     }
 
-    using ConsumerId = const void*;
-
-    using AtomIdSet = std::unordered_set<int32_t>;
     /**
      * @brief Set the Atom Ids object
      *
      * @param tagIds set of atoms ids
      * @param consumer used to differentiate the consumers to form proper superset of ids
      */
-    virtual void setAtomIds(AtomIdSet tagIds, ConsumerId consumer) {
+    void setAtomIds(AtomIdSet tagIds, ConsumerId consumer) override {
         std::lock_guard lock(mTagIdsMutex);
         mAtomIdsSetManager.setAtomIds(std::move(tagIds), consumer);
         mSetUpdateCounter.fetch_add(1, std::memory_order_relaxed);
