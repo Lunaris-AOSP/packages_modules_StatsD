@@ -33,6 +33,8 @@
 #include "tests/metrics/metrics_test_helper.h"
 #include "tests/statsd_test_util.h"
 
+using namespace testing;
+
 using ::aidl::android::os::StatsSubscriptionCallbackReason;
 using android::sp;
 using android::os::statsd::TestAtomReported;
@@ -43,22 +45,10 @@ using android::os::statsd::util::PHONE_SIGNAL_STRENGTH_CHANGED;
 using android::os::statsd::util::PLUGGED_STATE_CHANGED;
 using android::os::statsd::util::SCREEN_STATE_CHANGED;
 using android::os::statsd::util::TEST_ATOM_REPORTED;
+// using std::set;
+using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
-using testing::_;
-using testing::A;
-using testing::AtMost;
-using testing::ByMove;
-using testing::DoAll;
-using testing::InSequence;
-using testing::Invoke;
-using testing::MockFunction;
-using testing::NaggyMock;
-using testing::NiceMock;
-using testing::Return;
-using testing::SaveArg;
-using testing::SetArgPointee;
-using testing::StrictMock;
 
 namespace android {
 namespace os {

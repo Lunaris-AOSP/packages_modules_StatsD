@@ -59,16 +59,6 @@ using PackageInfoSnapshot = UidMapping_PackageInfoSnapshot;
 using PackageInfo = UidMapping_PackageInfoSnapshot_PackageInfo;
 using ::ndk::SharedRefBase;
 
-using std::map;
-using std::nullopt;
-using std::set;
-using std::shared_ptr;
-using std::string;
-using std::unique_ptr;
-using std::unordered_map;
-using std::unordered_set;
-using std::vector;
-
 // Wrapper for assertion helpers called from tests to keep track of source location of failures.
 // Example usage:
 //      static void myTestVerificationHelper(Foo foo) {
@@ -137,7 +127,7 @@ public:
 
 class StatsServiceConfigTest : public ::testing::Test {
 protected:
-    shared_ptr<StatsService> service;
+    std::shared_ptr<StatsService> service;
     const int kConfigKey = 789130123;  // Randomly chosen
     const int kCallingUid = 10100;     // Randomly chosen
 
@@ -160,7 +150,7 @@ protected:
                                           ADB_DUMP, NO_TIME_CONSTRAINTS, nullptr);
     }
 
-    virtual shared_ptr<StatsService> createStatsService() {
+    virtual std::shared_ptr<StatsService> createStatsService() {
         return SharedRefBase::make<StatsService>(new UidMap(), /* queue */ nullptr,
                                                  std::make_shared<LogEventFilter>());
     }
@@ -412,14 +402,14 @@ bool parseStatsEventToLogEvent(AStatsEvent* statsEvent, LogEvent* logEvent);
 AStatsEvent* makeTwoValueStatsEvent(int atomId, int64_t eventTimeNs, int32_t value1,
                                     int32_t value2);
 
-shared_ptr<LogEvent> CreateTwoValueLogEvent(int atomId, int64_t eventTimeNs, int32_t value1,
-                                            int32_t value2);
+std::shared_ptr<LogEvent> CreateTwoValueLogEvent(int atomId, int64_t eventTimeNs, int32_t value1,
+                                                 int32_t value2);
 
 void CreateTwoValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeNs, int32_t value1,
                             int32_t value2);
 
-shared_ptr<LogEvent> CreateThreeValueLogEvent(int atomId, int64_t eventTimeNs, int32_t value1,
-                                              int32_t value2, int32_t value3);
+std::shared_ptr<LogEvent> CreateThreeValueLogEvent(int atomId, int64_t eventTimeNs, int32_t value1,
+                                                   int32_t value2, int32_t value3);
 
 void CreateThreeValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeNs, int32_t value1,
                               int32_t value2, int32_t value3);
@@ -453,20 +443,21 @@ std::shared_ptr<LogEvent> makeUidLogEvent(int atomId, int64_t eventTimeNs, int u
                                           const std::vector<int>& data2)
         __INTRODUCED_IN(__ANDROID_API_T__);
 
-shared_ptr<LogEvent> makeExtraUidsLogEvent(int atomId, int64_t eventTimeNs, int uid1, int data1,
-                                           int data2, const std::vector<int>& extraUids);
+std::shared_ptr<LogEvent> makeExtraUidsLogEvent(int atomId, int64_t eventTimeNs, int uid1,
+                                                int data1, int data2,
+                                                const std::vector<int>& extraUids);
 
 std::shared_ptr<LogEvent> makeRepeatedUidLogEvent(int atomId, int64_t eventTimeNs,
                                                   const std::vector<int>& uids)
         __INTRODUCED_IN(__ANDROID_API_T__);
 
-shared_ptr<LogEvent> makeRepeatedUidLogEvent(int atomId, int64_t eventTimeNs,
-                                             const std::vector<int>& uids, int data1, int data2)
-        __INTRODUCED_IN(__ANDROID_API_T__);
+std::shared_ptr<LogEvent> makeRepeatedUidLogEvent(int atomId, int64_t eventTimeNs,
+                                                  const std::vector<int>& uids, int data1,
+                                                  int data2) __INTRODUCED_IN(__ANDROID_API_T__);
 
-shared_ptr<LogEvent> makeRepeatedUidLogEvent(int atomId, int64_t eventTimeNs,
-                                             const std::vector<int>& uids, int data1,
-                                             const std::vector<int>& data2)
+std::shared_ptr<LogEvent> makeRepeatedUidLogEvent(int atomId, int64_t eventTimeNs,
+                                                  const std::vector<int>& uids, int data1,
+                                                  const std::vector<int>& data2)
         __INTRODUCED_IN(__ANDROID_API_T__);
 
 std::shared_ptr<LogEvent> makeAttributionLogEvent(int atomId, int64_t eventTimeNs,
@@ -626,7 +617,7 @@ std::unique_ptr<LogEvent> createSocketLossInfoLogEvent(int32_t uid, int32_t loss
 // Create a statsd log event processor upon the start time in seconds, config and key.
 sp<StatsLogProcessor> CreateStatsLogProcessor(
         const int64_t timeBaseNs, int64_t currentTimeNs, const StatsdConfig& config,
-        const ConfigKey& key, const shared_ptr<IPullAtomCallback>& puller = nullptr,
+        const ConfigKey& key, const std::shared_ptr<IPullAtomCallback>& puller = nullptr,
         const int32_t atomTag = 0 /*for puller only*/, const sp<UidMap> = new UidMap(),
         const std::shared_ptr<LogEventFilter>& logEventFilter = std::make_shared<LogEventFilter>());
 
@@ -730,7 +721,7 @@ public:
     // Track the number of pulls.
     int pullNum = 1;
     Status onPullAtom(int atomTag,
-                      const shared_ptr<IPullAtomResultReceiver>& resultReceiver) override;
+                      const std::shared_ptr<IPullAtomResultReceiver>& resultReceiver) override;
 };
 
 class FakeCpuTimeCallback : public BnPullAtomCallback {
@@ -738,7 +729,7 @@ public:
     // Track the number of pulls.
     int pullNum = 1;
     Status onPullAtom(int atomTag,
-                      const shared_ptr<IPullAtomResultReceiver>& resultReceiver) override;
+                      const std::shared_ptr<IPullAtomResultReceiver>& resultReceiver) override;
 };
 
 template <typename T>

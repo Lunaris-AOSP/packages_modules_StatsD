@@ -26,6 +26,8 @@ namespace android {
 namespace os {
 namespace statsd {
 
+using std::nullopt;
+
 namespace {
 
 const int64_t metricId = 123456;

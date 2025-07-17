@@ -32,18 +32,19 @@
 #include "tests/statsd_test_util.h"
 #include "utils/DbUtils.h"
 
-using namespace android;
-using namespace testing;
-using ::ndk::SharedRefBase;
-using std::shared_ptr;
-
 namespace android {
 namespace os {
 namespace statsd {
 
+using namespace android;
+using namespace testing;
+
 using android::base::StringPrintf;
 using android::util::ProtoOutputStream;
-
+using ::ndk::SharedRefBase;
+using std::shared_ptr;
+using std::unique_ptr;
+using std::vector;
 using ::testing::Expectation;
 
 #ifdef __ANDROID__
