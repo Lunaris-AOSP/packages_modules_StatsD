@@ -158,7 +158,7 @@ private:
     size_t getAggregatedValueSize(const NumericValue& value) const override;
 
     bool hasAvgAggregationType(
-            const std::vector<ValueMetric::AggregationType> aggregationTypes) const {
+            const std::vector<ValueMetric::AggregationType>& aggregationTypes) const {
         for (const int aggType : aggregationTypes) {
             if (aggType == ValueMetric_AggregationType_AVG) {
                 return true;
