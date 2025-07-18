@@ -822,6 +822,17 @@ shared_ptr<LogEvent> CreateThreeValueLogEvent(int atomId, int64_t eventTimeNs, i
     return logEvent;
 }
 
+void CreateRepeatedValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeNs, float value) {
+    AStatsEvent* statsEvent = AStatsEvent_obtain();
+    AStatsEvent_setAtomId(statsEvent, atomId);
+    AStatsEvent_overwriteTimestamp(statsEvent, eventTimeNs);
+
+    AStatsEvent_writeFloat(statsEvent, value);
+    AStatsEvent_writeFloat(statsEvent, value);
+
+    parseStatsEventToLogEvent(statsEvent, logEvent);
+}
+
 void CreateRepeatedValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeNs,
                                  int32_t value) {
     AStatsEvent* statsEvent = AStatsEvent_obtain();

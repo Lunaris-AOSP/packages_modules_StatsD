@@ -429,9 +429,9 @@ void CreateThreeValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeN
 // in the value of the second field but still need the first field to be populated.
 std::shared_ptr<LogEvent> CreateRepeatedValueLogEvent(int atomId, int64_t eventTimeNs,
                                                       int32_t value);
-
 void CreateRepeatedValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeNs,
                                  int32_t value);
+void CreateRepeatedValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeNs, float value);
 
 std::shared_ptr<LogEvent> CreateNoValuesLogEvent(int atomId, int64_t eventTimeNs);
 
@@ -740,6 +740,21 @@ public:
     Status onPullAtom(int atomTag,
                       const shared_ptr<IPullAtomResultReceiver>& resultReceiver) override;
 };
+
+template <typename T>
+void CreateLogEventNumeric(LogEvent* logEvent, int atomId, int64_t eventTimeNs, T val) {
+    AStatsEvent* statsEvent = AStatsEvent_obtain();
+    AStatsEvent_setAtomId(statsEvent, atomId);
+    AStatsEvent_overwriteTimestamp(statsEvent, eventTimeNs);
+    if (std::is_same_v<T, int32_t>) {
+        AStatsEvent_writeInt32(statsEvent, val);
+    } else if (std::is_same_v<T, float>) {
+        AStatsEvent_writeFloat(statsEvent, val);
+    } else if (std::is_same_v<T, int64_t>) {
+        AStatsEvent_writeInt64(statsEvent, val);
+    }
+    parseStatsEventToLogEvent(statsEvent, logEvent);
+}
 
 template <typename T>
 void backfillDimensionPath(const DimensionsValue& whatPath, T* metricData) {

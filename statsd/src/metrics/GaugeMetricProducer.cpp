@@ -19,6 +19,8 @@
 
 #include "GaugeMetricProducer.h"
 
+#include <optional>
+
 #include "guardrail/StatsdStats.h"
 #include "metrics/parsing_utils/metrics_manager_util.h"
 #include "stats_log_util.h"
@@ -77,6 +79,20 @@ const int FIELD_ID_AGGREGATED_ATOM = 9;
 const int FIELD_ID_ATOM_VALUE = 1;
 const int FIELD_ID_ATOM_TIMESTAMPS = 2;
 const int FIELD_ID_AGGREGATED_STATE = 3;
+
+// Converts the Value to a double.
+// Returns an std::optional<double> which will be empty if the Value is not numeric.
+// Note for int64_t values that exceed 2^53, there may be a loss of precision.
+static std::optional<double> toDouble(const Value& value) {
+    if (value.getType() == INT) {
+        return static_cast<double>(value.get<int32_t>());
+    } else if (value.getType() == LONG) {
+        return static_cast<double>(value.get<int64_t>());
+    } else if (value.getType() == FLOAT) {
+        return static_cast<double>(value.get<float>());
+    }
+    return std::nullopt;
+}
 
 GaugeMetricProducer::GaugeMetricProducer(
         const ConfigKey& key, const GaugeMetric& metric, const int conditionIndex,
@@ -633,15 +649,15 @@ void GaugeMetricProducer::onMatchedLogEventInternalLocked(
     if (mAnomalyTrackers.size() > 0) {
         if (gaugeAtom.mFields.size() == 1) {
             const Value& value = gaugeAtom.mFields.begin()->mValue;
-            long gaugeVal = 0;
-            if (value.getType() == INT) {
-                gaugeVal = (long)value.get<int32_t>();
-            } else if (value.getType() == LONG) {
-                gaugeVal = value.get<int64_t>();
-            }
-            for (auto& tracker : mAnomalyTrackers) {
-                tracker->detectAndDeclareAnomaly(eventTimeNs, mCurrentBucketNum, mMetricId,
-                                                 eventKey, gaugeVal);
+            auto gaugeVal = toDouble(value);
+            if (gaugeVal.has_value()) {
+                for (auto& tracker : mAnomalyTrackers) {
+                    tracker->detectAndDeclareAnomaly(eventTimeNs, mCurrentBucketNum, mMetricId,
+                                                     eventKey, gaugeVal.value());
+                }
+            } else {
+                VLOG("Gauge metric %lld has non-numeric field for anomaly detection",
+                     (long long)mMetricId);
             }
         }
     }
@@ -652,14 +668,18 @@ void GaugeMetricProducer::updateCurrentSlicedBucketForAnomaly() {
         if (slice.second.empty()) {
             continue;
         }
+        // TODO(b/431880913): here it assumes anomaly detection works for
+        // the first atom's first field, but the code in onMatchedLogEvent()
+        // checks if there is only one value. It only sends the first atom
+        // per dimension to anomaly detection.
         const Value& value = slice.second.front().mFields.front().mValue;
-        long gaugeVal = 0;
-        if (value.getType() == INT) {
-            gaugeVal = (long)value.get<int32_t>();
-        } else if (value.getType() == LONG) {
-            gaugeVal = value.get<int64_t>();
+        auto doubleVal = toDouble(value);
+        if (!doubleVal.has_value()) {
+            VLOG("Gauge metric %lld has non-numeric field for anomaly detection",
+                 (long long)mMetricId);
         }
-        (*mCurrentSlicedBucketForAnomaly)[slice.first] = gaugeVal;
+        (*mCurrentSlicedBucketForAnomaly)[slice.first] =
+                doubleVal.has_value() ? doubleVal.value() : 0;
     }
 }
 

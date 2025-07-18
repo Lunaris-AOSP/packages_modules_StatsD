@@ -41,7 +41,7 @@ const MetricDimensionKey DEFAULT_METRIC_DIMENSION_KEY = MetricDimensionKey();
 
 typedef std::map<int64_t, HashableDimensionKey> ConditionKey;
 
-typedef std::unordered_map<MetricDimensionKey, int64_t> DimToValMap;
+typedef std::unordered_map<MetricDimensionKey, double> DimToValMap;
 
 using ConditionLinks = google::protobuf::RepeatedPtrField<MetricConditionLink>;
 
