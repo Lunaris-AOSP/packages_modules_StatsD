@@ -27,12 +27,15 @@
 
 #ifdef __ANDROID__
 
-using android::util::ProtoReader;
-using std::string;
-
 namespace android {
 namespace os {
 namespace statsd {
+
+using android::util::ProtoReader;
+using std::set;
+using std::string;
+using std::unique_ptr;
+using std::vector;
 
 namespace {
 

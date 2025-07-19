@@ -44,6 +44,7 @@ using Change = UidMapping_Change;
 
 using std::nullopt;
 using std::set;
+using std::shared_ptr;
 using std::string;
 using std::to_string;
 using std::vector;

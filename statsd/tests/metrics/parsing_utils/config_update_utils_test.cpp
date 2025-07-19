@@ -42,6 +42,7 @@ using std::map;
 using std::nullopt;
 using std::optional;
 using std::set;
+using std::shared_ptr;
 using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
