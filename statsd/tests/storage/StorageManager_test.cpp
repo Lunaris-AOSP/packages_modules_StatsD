@@ -34,8 +34,8 @@ using namespace testing;
 
 using std::make_shared;
 using std::shared_ptr;
+using std::unique_ptr;
 using std::vector;
-using testing::Contains;
 
 TEST(StorageManagerTest, TrainInfoReadWriteTest) {
     InstallTrainInfo trainInfo;

@@ -36,6 +36,7 @@ using android::sp;
 using std::make_shared;
 using std::nullopt;
 using std::set;
+using std::shared_ptr;
 using std::unordered_map;
 using std::vector;
 

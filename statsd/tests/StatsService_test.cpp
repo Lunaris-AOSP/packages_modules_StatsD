@@ -30,17 +30,19 @@
 #include "src/statsd_config.pb.h"
 #include "tests/statsd_test_util.h"
 
-using namespace android;
-using namespace testing;
-
 namespace android {
 namespace os {
 namespace statsd {
 
+using namespace android;
+using namespace testing;
+
 using android::base::StringPrintf;
 using ::ndk::SharedRefBase;
-
 using Status = ::ndk::ScopedAStatus;
+using std::nullopt;
+using std::shared_ptr;
+using std::vector;
 
 #ifdef __ANDROID__
 
