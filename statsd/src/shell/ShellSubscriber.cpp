@@ -26,15 +26,20 @@
 #include "stats_log_util.h"
 #include "utils/api_tracing.h"
 
-using aidl::android::os::IStatsSubscriptionCallback;
-
 namespace android {
 namespace os {
 namespace statsd {
 
+using aidl::android::os::IStatsSubscriptionCallback;
+
+using namespace std::chrono_literals;
+using std::shared_ptr;
+using std::unique_ptr;
+using std::vector;
+
 ShellSubscriber::~ShellSubscriber() {
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        std::lock_guard lock(mMutex);
         mClientSet.clear();
         updateAtomIdsInUseLocked();
     }
@@ -45,7 +50,7 @@ ShellSubscriber::~ShellSubscriber() {
 }
 
 bool ShellSubscriber::startNewSubscription(int in, int out, int64_t timeoutSec) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
     VLOG("ShellSubscriber: new subscription has come in");
     if (mClientSet.size() >= kMaxSubscriptions) {
         ALOGE("ShellSubscriber: cannot have another active subscription. Current Subscriptions: "
@@ -60,7 +65,7 @@ bool ShellSubscriber::startNewSubscription(int in, int out, int64_t timeoutSec) 
 
 bool ShellSubscriber::startNewSubscription(const vector<uint8_t>& subscriptionConfig,
                                            const shared_ptr<IStatsSubscriptionCallback>& callback) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
     VLOG("ShellSubscriber: new subscription has come in");
     if (mClientSet.size() >= kMaxSubscriptions) {
         ALOGE("ShellSubscriber: cannot have another active subscription. Current Subscriptions: "
@@ -87,7 +92,7 @@ bool ShellSubscriber::startNewSubscriptionLocked(unique_ptr<ShellSubscriberClien
         if (mThread.joinable()) {
             mThread.join();
         }
-        mThread = thread([this] { pullAndSendHeartbeats(); });
+        mThread = std::thread([this] { pullAndSendHeartbeats(); });
     }
 
     return true;
@@ -136,7 +141,7 @@ void ShellSubscriber::onLogEvent(const LogEvent& event) {
     if (event.isRestricted()) {
         return;
     }
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
     for (auto clientIt = mClientSet.begin(); clientIt != mClientSet.end();) {
         (*clientIt)->onLogEvent(event);
         if ((*clientIt)->isAlive()) {
@@ -152,7 +157,7 @@ void ShellSubscriber::onLogEvent(const LogEvent& event) {
 }
 
 void ShellSubscriber::flushSubscription(const shared_ptr<IStatsSubscriptionCallback>& callback) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
 
     // TODO(b/268822860): Consider storing callback clients in a map keyed by
     // IStatsSubscriptionCallback to avoid this linear search.
@@ -177,7 +182,7 @@ void ShellSubscriber::flushSubscription(const shared_ptr<IStatsSubscriptionCallb
 }
 
 void ShellSubscriber::unsubscribe(const shared_ptr<IStatsSubscriptionCallback>& callback) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    std::lock_guard lock(mMutex);
 
     // TODO(b/268822860): Consider storing callback clients in a map keyed by
     // IStatsSubscriptionCallback to avoid this linear search.

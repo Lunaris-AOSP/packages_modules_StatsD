@@ -67,15 +67,16 @@ public:
 
     // Create new ShellSubscriberClient with Binder callback to manage a new subscription.
     bool startNewSubscription(
-            const vector<uint8_t>& subscriptionConfig,
-            const shared_ptr<aidl::android::os::IStatsSubscriptionCallback>& callback);
+            const std::vector<uint8_t>& subscriptionConfig,
+            const std::shared_ptr<aidl::android::os::IStatsSubscriptionCallback>& callback);
 
     void onLogEvent(const LogEvent& event);
 
     void flushSubscription(
-            const shared_ptr<aidl::android::os::IStatsSubscriptionCallback>& callback);
+            const std::shared_ptr<aidl::android::os::IStatsSubscriptionCallback>& callback);
 
-    void unsubscribe(const shared_ptr<aidl::android::os::IStatsSubscriptionCallback>& callback);
+    void unsubscribe(
+            const std::shared_ptr<aidl::android::os::IStatsSubscriptionCallback>& callback);
 
     static size_t getMaxSizeKb() {
         return ShellSubscriberClient::getMaxSizeKb();
@@ -86,7 +87,7 @@ public:
     }
 
 private:
-    bool startNewSubscriptionLocked(unique_ptr<ShellSubscriberClient> client);
+    bool startNewSubscriptionLocked(std::unique_ptr<ShellSubscriberClient> client);
 
     void pullAndSendHeartbeats();
 
@@ -102,7 +103,7 @@ private:
     // Protects mClientSet, mThreadAlive, and ShellSubscriberClient
     mutable std::mutex mMutex;
 
-    std::set<unique_ptr<ShellSubscriberClient>> mClientSet;
+    std::set<std::unique_ptr<ShellSubscriberClient>> mClientSet;
 
     bool mThreadAlive = false;
 

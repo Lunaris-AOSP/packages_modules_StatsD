@@ -40,7 +40,7 @@ public:
                            const std::unordered_map<int64_t, int>& matcherMap,
                            std::vector<uint8_t>& stack) override;
 
-    optional<InvalidConfigReason> onConfigUpdated(
+    std::optional<InvalidConfigReason> onConfigUpdated(
             const AtomMatcher& matcher,
             const std::unordered_map<int64_t, int>& atomMatchingTrackerMap) override;
 

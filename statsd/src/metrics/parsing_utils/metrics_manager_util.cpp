@@ -44,14 +44,20 @@
 #include "state/StateManager.h"
 #include "stats_util.h"
 
-using google::protobuf::MessageLite;
-using std::set;
-using std::unordered_map;
-using std::vector;
-
 namespace android {
 namespace os {
 namespace statsd {
+
+using google::protobuf::MessageLite;
+using std::map;
+using std::nullopt;
+using std::optional;
+using std::set;
+using std::shared_ptr;
+using std::string;
+using std::to_string;
+using std::unordered_map;
+using std::vector;
 
 namespace {
 

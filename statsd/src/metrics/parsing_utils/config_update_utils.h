@@ -46,7 +46,7 @@ namespace statsd {
 //                     be updated from UPDATE_UNKNOWN after this call.
 // [cycleTracker]: intermediate param used during recursion.
 // Returns nullopt if successful and InvalidConfigReason if not.
-optional<InvalidConfigReason> determineMatcherUpdateStatus(
+std::optional<InvalidConfigReason> determineMatcherUpdateStatus(
         const StatsdConfig& config, int matcherIdx,
         const std::unordered_map<int64_t, int>& oldAtomMatchingTrackerMap,
         const std::vector<sp<AtomMatchingTracker>>& oldAtomMatchingTrackers,
@@ -64,7 +64,7 @@ optional<InvalidConfigReason> determineMatcherUpdateStatus(
 // [newAtomMatchingTrackers]: stores the new AtomMatchingTrackers
 // [replacedMatchers]: set of matcher ids that changed and have been replaced
 // Returns nullopt if successful and InvalidConfigReason if not.
-optional<InvalidConfigReason> updateAtomMatchingTrackers(
+std::optional<InvalidConfigReason> updateAtomMatchingTrackers(
         const StatsdConfig& config, const sp<UidMap>& uidMap,
         const std::unordered_map<int64_t, int>& oldAtomMatchingTrackerMap,
         const std::vector<sp<AtomMatchingTracker>>& oldAtomMatchingTrackers,
@@ -86,7 +86,7 @@ optional<InvalidConfigReason> updateAtomMatchingTrackers(
 //                       be updated from UPDATE_UNKNOWN after this call.
 // [cycleTracker]: intermediate param used during recursion.
 // Returns nullopt if successful and InvalidConfigReason if not.
-optional<InvalidConfigReason> determineConditionUpdateStatus(
+std::optional<InvalidConfigReason> determineConditionUpdateStatus(
         const StatsdConfig& config, int conditionIdx,
         const std::unordered_map<int64_t, int>& oldConditionTrackerMap,
         const std::vector<sp<ConditionTracker>>& oldConditionTrackers,
@@ -109,7 +109,7 @@ optional<InvalidConfigReason> determineConditionUpdateStatus(
 // [conditionCache]: stores the current conditions for each ConditionTracker
 // [replacedConditions]: set of condition ids that have changed and have been replaced
 // Returns nullopt if successful and InvalidConfigReason if not.
-optional<InvalidConfigReason> updateConditions(
+std::optional<InvalidConfigReason> updateConditions(
         const ConfigKey& key, const StatsdConfig& config,
         const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
         const std::set<int64_t>& replacedMatchers,
@@ -120,7 +120,7 @@ optional<InvalidConfigReason> updateConditions(
         std::unordered_map<int, std::vector<int>>& trackerToConditionMap,
         std::vector<ConditionState>& conditionCache, std::set<int64_t>& replacedConditions);
 
-optional<InvalidConfigReason> updateStates(
+std::optional<InvalidConfigReason> updateStates(
         const StatsdConfig& config, const std::map<int64_t, uint64_t>& oldStateProtoHashes,
         std::unordered_map<int64_t, int>& stateAtomIdMap,
         std::unordered_map<int64_t, std::unordered_map<int, int64_t>>& allStateGroupMaps,
@@ -137,12 +137,12 @@ optional<InvalidConfigReason> updateStates(
 // output:
 // [metricsToUpdate]: update status of each metric. Will be changed from UPDATE_UNKNOWN
 // Returns nullopt if successful and InvalidConfigReason if not.
-optional<InvalidConfigReason> determineAllMetricUpdateStatuses(
-        const StatsdConfig& config, const unordered_map<int64_t, int>& oldMetricProducerMap,
-        const vector<sp<MetricProducer>>& oldMetricProducers,
-        const unordered_map<int64_t, int>& metricToActivationMap,
-        const set<int64_t>& replacedMatchers, const set<int64_t>& replacedConditions,
-        const set<int64_t>& replacedStates, vector<UpdateStatus>& metricsToUpdate);
+std::optional<InvalidConfigReason> determineAllMetricUpdateStatuses(
+        const StatsdConfig& config, const std::unordered_map<int64_t, int>& oldMetricProducerMap,
+        const std::vector<sp<MetricProducer>>& oldMetricProducers,
+        const std::unordered_map<int64_t, int>& metricToActivationMap,
+        const std::set<int64_t>& replacedMatchers, const std::set<int64_t>& replacedConditions,
+        const std::set<int64_t>& replacedStates, std::vector<UpdateStatus>& metricsToUpdate);
 
 // Update MetricProducers.
 // input:
@@ -164,7 +164,7 @@ optional<InvalidConfigReason> determineAllMetricUpdateStatuses(
 //                          the list of MetricProducer index
 // [trackerToMetricMap]: contains the mapping from log tracker to MetricProducer index.
 // Returns nullopt if successful and InvalidConfigReason if not.
-optional<InvalidConfigReason> updateMetrics(
+std::optional<InvalidConfigReason> updateMetrics(
         const ConfigKey& key, const StatsdConfig& config, int64_t timeBaseNs,
         const int64_t currentTimeNs, const sp<StatsPullerManager>& pullerManager,
         const std::unordered_map<int64_t, int>& oldAtomMatchingTrackerMap,
@@ -198,7 +198,7 @@ optional<InvalidConfigReason> updateMetrics(
 // output:
 // [updateStatus]: update status of the alert. Will be changed from UPDATE_UNKNOWN
 // Returns nullopt if successful and InvalidConfigReason if not.
-optional<InvalidConfigReason> determineAlertUpdateStatus(
+std::optional<InvalidConfigReason> determineAlertUpdateStatus(
         const Alert& alert, const std::unordered_map<int64_t, int>& oldAlertTrackerMap,
         const std::vector<sp<AnomalyTracker>>& oldAnomalyTrackers,
         const std::set<int64_t>& replacedMetrics, UpdateStatus& updateStatus);
@@ -220,7 +220,7 @@ optional<InvalidConfigReason> determineAlertUpdateStatus(
 // [newAlertTrackerMap]: mapping of alert id to index in the new config
 // [newAnomalyTrackers]: contains the list of sp to the AnomalyTrackers created.
 // Returns nullopt if successful and InvalidConfigReason if not.
-optional<InvalidConfigReason> updateAlerts(
+std::optional<InvalidConfigReason> updateAlerts(
         const StatsdConfig& config, int64_t currentTimeNs,
         const std::unordered_map<int64_t, int>& metricProducerMap,
         const std::set<int64_t>& replacedMetrics,
@@ -233,7 +233,7 @@ optional<InvalidConfigReason> updateAlerts(
 
 // Updates the existing MetricsManager from a new StatsdConfig.
 // Parameters are the members of MetricsManager. See MetricsManager for declaration.
-optional<InvalidConfigReason> updateStatsdConfig(
+std::optional<InvalidConfigReason> updateStatsdConfig(
         const ConfigKey& key, const StatsdConfig& config, const sp<UidMap>& uidMap,
         const sp<StatsPullerManager>& pullerManager, const sp<AlarmMonitor>& anomalyAlarmMonitor,
         const sp<AlarmMonitor>& periodicAlarmMonitor, int64_t timeBaseNs,

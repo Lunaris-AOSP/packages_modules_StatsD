@@ -23,12 +23,21 @@
 #include "matchers/matcher_util.h"
 #include "stats_log_util.h"
 
-using android::base::unique_fd;
-using Status = ::ndk::ScopedAStatus;
-
 namespace android {
 namespace os {
 namespace statsd {
+
+using android::base::unique_fd;
+using Status = ::ndk::ScopedAStatus;
+using std::max;
+using std::min;
+using std::nullopt;
+using std::optional;
+using std::set;
+using std::shared_ptr;
+using std::string;
+using std::unique_ptr;
+using std::vector;
 
 const static int FIELD_ID_SHELL_DATA__ATOM = 1;
 const static int FIELD_ID_SHELL_DATA__ELAPSED_TIMESTAMP_NANOS = 2;
@@ -83,9 +92,8 @@ static optional<ReadConfigResult> readConfig(const vector<uint8_t>& configBytes,
 }
 
 ShellSubscriberClient::PullInfo::PullInfo(const SimpleAtomMatcher& matcher, int64_t startTimeMs,
-                                          int64_t intervalMs,
-                                          const std::vector<std::string>& packages,
-                                          const std::vector<int32_t>& uids)
+                                          int64_t intervalMs, const vector<string>& packages,
+                                          const vector<int32_t>& uids)
     : mPullerMatcher(matcher),
       mIntervalMs(intervalMs),
       mPrevPullElapsedRealtimeMs(startTimeMs),
@@ -93,11 +101,12 @@ ShellSubscriberClient::PullInfo::PullInfo(const SimpleAtomMatcher& matcher, int6
       mPullUids(uids) {
 }
 
-ShellSubscriberClient::ShellSubscriberClient(
-        int id, int out, const std::shared_ptr<IStatsSubscriptionCallback>& callback,
-        const std::vector<SimpleAtomMatcher>& pushedMatchers,
-        const std::vector<PullInfo>& pulledInfo, int64_t timeoutSec, int64_t startTimeSec,
-        const sp<UidMap>& uidMap, const sp<StatsPullerManager>& pullerMgr)
+ShellSubscriberClient::ShellSubscriberClient(int id, int out,
+                                             const shared_ptr<IStatsSubscriptionCallback>& callback,
+                                             const vector<SimpleAtomMatcher>& pushedMatchers,
+                                             const vector<PullInfo>& pulledInfo, int64_t timeoutSec,
+                                             int64_t startTimeSec, const sp<UidMap>& uidMap,
+                                             const sp<StatsPullerManager>& pullerMgr)
     : mId(id),
       mUidMap(uidMap),
       mPullerMgr(pullerMgr),
@@ -108,7 +117,7 @@ ShellSubscriberClient::ShellSubscriberClient(
       mTimeoutSec(timeoutSec),
       mStartTimeSec(startTimeSec),
       mLastWriteMs(startTimeSec * 1000),
-      mCacheSize(0){};
+      mCacheSize(0) {};
 
 unique_ptr<ShellSubscriberClient> ShellSubscriberClient::create(
         int in, int out, int64_t timeoutSec, int64_t startTimeSec, const sp<UidMap>& uidMap,

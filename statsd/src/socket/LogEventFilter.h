@@ -67,7 +67,7 @@ public:
 
         // check if there is an updated set of interesting atom ids
         if (mLocalSetUpdateCounter != mSetUpdateCounter.load(std::memory_order_relaxed)) {
-            std::lock_guard<std::mutex> guard(mTagIdsMutex);
+            std::lock_guard guard(mTagIdsMutex);
             mLocalSetUpdateCounter = mSetUpdateCounter.load(std::memory_order_relaxed);
             mLocalTagIds.swap(mTagIds);
         }

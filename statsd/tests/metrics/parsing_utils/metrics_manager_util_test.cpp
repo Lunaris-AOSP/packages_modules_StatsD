@@ -42,6 +42,8 @@ using namespace testing;
 using android::sp;
 using android::os::statsd::Predicate;
 using std::map;
+using std::nullopt;
+using std::optional;
 using std::set;
 using std::unordered_map;
 using std::vector;
@@ -331,7 +333,7 @@ struct DimLimitTestCase {
     int configLimit;
     int actualLimit;
 
-    friend void PrintTo(const DimLimitTestCase& testCase, ostream* os) {
+    friend void PrintTo(const DimLimitTestCase& testCase, std::ostream* os) {
         *os << testCase.configLimit;
     }
 };

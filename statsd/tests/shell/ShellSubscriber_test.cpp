@@ -43,6 +43,7 @@ using android::os::statsd::util::PHONE_SIGNAL_STRENGTH_CHANGED;
 using android::os::statsd::util::PLUGGED_STATE_CHANGED;
 using android::os::statsd::util::SCREEN_STATE_CHANGED;
 using android::os::statsd::util::TEST_ATOM_REPORTED;
+using std::unique_ptr;
 using std::vector;
 using testing::_;
 using testing::A;
@@ -247,7 +248,7 @@ protected:
           mockLogEventFilter(std::make_shared<MockLogEventFilter>()),
           shellSubscriber(uidMap, pullerManager, mockLogEventFilter),
           callback(SharedRefBase::make<StrictMock<MockStatsSubscriptionCallback>>()),
-          reason(nullopt) {
+          reason(std::nullopt) {
     }
 
     void SetUp() override {

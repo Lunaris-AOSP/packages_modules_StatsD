@@ -63,7 +63,7 @@ protected:
     sp<AlarmMonitor> anomalyAlarmMonitor;
     sp<AlarmMonitor> periodicAlarmMonitor;
     sp<ConfigMetadataProvider> configMetadataProvider;
-    std::unordered_map<int, vector<int>> allTagIdsToMatchersMap;
+    std::unordered_map<int, std::vector<int>> allTagIdsToMatchersMap;
     std::vector<sp<AtomMatchingTracker>> allAtomMatchingTrackers;
     std::unordered_map<int64_t, int> atomMatchingTrackerMap;
     std::vector<sp<ConditionTracker>> allConditionTrackers;

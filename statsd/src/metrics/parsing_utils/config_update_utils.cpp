@@ -24,11 +24,18 @@
 #include "matchers/EventMatcherWizard.h"
 #include "metrics_manager_util.h"
 
-using google::protobuf::MessageLite;
-
 namespace android {
 namespace os {
 namespace statsd {
+
+using google::protobuf::MessageLite;
+using std::map;
+using std::nullopt;
+using std::optional;
+using std::set;
+using std::string;
+using std::unordered_map;
+using std::vector;
 
 // Recursive function to determine if a matcher needs to be updated. Populates matcherUpdateStatus.
 // Returns nullopt if successful and InvalidConfigReason if not.

@@ -27,7 +27,10 @@
 using aidl::android::util::StatsEventParcel;
 using android::base::SetProperty;
 using android::base::StringPrintf;
+using std::optional;
+using std::pair;
 using std::shared_ptr;
+using std::vector;
 using zetasketch::android::AggregatorStateProto;
 
 namespace android {
@@ -817,6 +820,17 @@ shared_ptr<LogEvent> CreateThreeValueLogEvent(int atomId, int64_t eventTimeNs, i
     shared_ptr<LogEvent> logEvent = std::make_shared<LogEvent>(/*uid=*/0, /*pid=*/0);
     CreateThreeValueLogEvent(logEvent.get(), atomId, eventTimeNs, value1, value2, value3);
     return logEvent;
+}
+
+void CreateRepeatedValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeNs, float value) {
+    AStatsEvent* statsEvent = AStatsEvent_obtain();
+    AStatsEvent_setAtomId(statsEvent, atomId);
+    AStatsEvent_overwriteTimestamp(statsEvent, eventTimeNs);
+
+    AStatsEvent_writeFloat(statsEvent, value);
+    AStatsEvent_writeFloat(statsEvent, value);
+
+    parseStatsEventToLogEvent(statsEvent, logEvent);
 }
 
 void CreateRepeatedValueLogEvent(LogEvent* logEvent, int atomId, int64_t eventTimeNs,
@@ -2174,10 +2188,10 @@ void backfillAggregatedAtomsInEventMetric(StatsLogReport::EventMetricDataWrapper
         return;
     }
 
-    sort(metricData.begin(), metricData.end(),
-         [](const EventMetricData& lhs, const EventMetricData& rhs) {
-             return lhs.elapsed_timestamp_nanos() < rhs.elapsed_timestamp_nanos();
-         });
+    std::sort(metricData.begin(), metricData.end(),
+              [](const EventMetricData& lhs, const EventMetricData& rhs) {
+                  return lhs.elapsed_timestamp_nanos() < rhs.elapsed_timestamp_nanos();
+              });
 
     wrapper->clear_data();
     for (int i = 0; i < metricData.size(); ++i) {
@@ -2212,24 +2226,25 @@ vector<pair<Atom, int64_t>> unnestGaugeAtomData(const GaugeBucketInfo& bucketInf
     for (int k = 0; k < bucketInfo.aggregated_atom_info_size(); ++k) {
         const AggregatedAtomInfo& atomInfo = bucketInfo.aggregated_atom_info(k);
         for (int l = 0; l < atomInfo.elapsed_timestamp_nanos_size(); ++l) {
-            atomData.push_back(make_pair(atomInfo.atom(), atomInfo.elapsed_timestamp_nanos(l)));
+            atomData.push_back(
+                    std::make_pair(atomInfo.atom(), atomInfo.elapsed_timestamp_nanos(l)));
         }
     }
 
-    sort(atomData.begin(), atomData.end(),
-         [](const pair<Atom, int64_t>& lhs, const pair<Atom, int64_t>& rhs) {
-             return lhs.second < rhs.second;
-         });
+    std::sort(atomData.begin(), atomData.end(),
+              [](const pair<Atom, int64_t>& lhs, const pair<Atom, int64_t>& rhs) {
+                  return lhs.second < rhs.second;
+              });
 
     return atomData;
 }
 
 void sortReportsByElapsedTime(ConfigMetricsReportList* configReportList) {
     RepeatedPtrField<ConfigMetricsReport>* reports = configReportList->mutable_reports();
-    sort(reports->pointer_begin(), reports->pointer_end(),
-         [](const ConfigMetricsReport* lhs, const ConfigMetricsReport* rhs) {
-             return lhs->current_report_elapsed_nanos() < rhs->current_report_elapsed_nanos();
-         });
+    std::sort(reports->pointer_begin(), reports->pointer_end(),
+              [](const ConfigMetricsReport* lhs, const ConfigMetricsReport* rhs) {
+                  return lhs->current_report_elapsed_nanos() < rhs->current_report_elapsed_nanos();
+              });
 }
 
 Status FakeSubsystemSleepCallback::onPullAtom(int atomTag,

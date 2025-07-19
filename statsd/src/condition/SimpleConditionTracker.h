@@ -35,13 +35,13 @@ public:
 
     ~SimpleConditionTracker();
 
-    optional<InvalidConfigReason> init(
+    std::optional<InvalidConfigReason> init(
             const std::vector<Predicate>& allConditionConfig,
             const std::vector<sp<ConditionTracker>>& allConditionTrackers,
             const std::unordered_map<int64_t, int>& conditionIdIndexMap,
             std::vector<uint8_t>& stack, std::vector<ConditionState>& conditionCache) override;
 
-    optional<InvalidConfigReason> onConfigUpdated(
+    std::optional<InvalidConfigReason> onConfigUpdated(
             const std::vector<Predicate>& allConditionProtos, int index,
             const std::vector<sp<ConditionTracker>>& allConditionTrackers,
             const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
@@ -89,10 +89,9 @@ public:
         return true;
     }
 
-    bool equalOutputDimensions(
-        const std::vector<sp<ConditionTracker>>& allConditions,
-        const vector<Matcher>& dimensions) const override {
-            return equalDimensions(mOutputDimensions, dimensions);
+    bool equalOutputDimensions(const std::vector<sp<ConditionTracker>>& allConditions,
+                               const std::vector<Matcher>& dimensions) const override {
+        return equalDimensions(mOutputDimensions, dimensions);
     }
 
 private:

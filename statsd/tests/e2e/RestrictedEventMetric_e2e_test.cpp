@@ -31,6 +31,7 @@ namespace os {
 namespace statsd {
 
 using base::StringPrintf;
+using std::to_string;
 
 #ifdef __ANDROID__
 

@@ -38,6 +38,7 @@ const int FIELD_ID_EXPERIMENT_ID = 1;
 using namespace android::util;
 using android::base::StringPrintf;
 using android::util::ProtoOutputStream;
+using std::set;
 using std::string;
 using std::vector;
 

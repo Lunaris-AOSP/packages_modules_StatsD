@@ -22,6 +22,8 @@ namespace android {
 namespace os {
 namespace statsd {
 
+using std::nullopt;
+using std::optional;
 using std::unordered_map;
 using std::vector;
 

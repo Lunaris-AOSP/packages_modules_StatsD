@@ -183,7 +183,7 @@ public:
         // Since we do not have statsd on host - the getStatsService() is no-op and
         // should return nullptr
 #ifdef __ANDROID__
-        std::lock_guard<std::mutex> lock(mStatsdMutex);
+        std::lock_guard lock(mStatsdMutex);
         if (!mStatsd) {
             // Fetch statsd
             ndk::SpAIBinder binder(getStatsdBinder());
@@ -197,7 +197,7 @@ public:
     }
 
     void resetStatsService() {
-        std::lock_guard<std::mutex> lock(mStatsdMutex);
+        std::lock_guard lock(mStatsdMutex);
         mStatsd = nullptr;
     }
 
@@ -214,7 +214,7 @@ public:
         // copy of the data with the lock held before iterating through the map.
         std::map<int32_t, std::shared_ptr<StatsPullAtomCallbackInternal>> pullersCopy;
         {
-            std::lock_guard<std::mutex> lock(pullersMutex);
+            std::lock_guard lock(pullersMutex);
             pullersCopy = pullers;
         }
         for (const auto& it : pullersCopy) {
@@ -315,7 +315,7 @@ private:
     }
 
     void pushToQueue(std::unique_ptr<Cmd> cmd) {
-        std::lock_guard<std::mutex> lock(mMutex);
+        std::lock_guard lock(mMutex);
         mCmdQueue.push(std::move(cmd));
     }
 
@@ -341,7 +341,7 @@ private:
         if (!statsService) {
             // Statsd not available - dropping all submitted command requests
             std::queue<std::unique_ptr<Cmd>> emptyQueue;
-            std::lock_guard<std::mutex> lock(mMutex);
+            std::lock_guard lock(mMutex);
             mCmdQueue.swap(emptyQueue);
             mThreadAlive = false;
             return;
@@ -353,7 +353,7 @@ private:
                 /**
                  * To guarantee sequential commands processing we need to lock mutex queue
                  */
-                std::lock_guard<std::mutex> lock(mMutex);
+                std::lock_guard lock(mMutex);
                 if (mCmdQueue.empty()) {
                     mThreadAlive = false;
                     return;
@@ -394,7 +394,7 @@ void AStatsManager_setPullAtomCallback(int32_t atom_tag, AStatsManager_PullAtomM
                                                                timeoutMillis, additiveFields);
 
     {
-        std::lock_guard<std::mutex> lock(pullersMutex);
+        std::lock_guard lock(pullersMutex);
         // Always add to the map. If statsd is dead, we will add them when it comes back.
         pullers[atom_tag] = callbackBinder;
     }
@@ -404,7 +404,7 @@ void AStatsManager_setPullAtomCallback(int32_t atom_tag, AStatsManager_PullAtomM
 
 void AStatsManager_clearPullAtomCallback(int32_t atom_tag) {
     {
-        std::lock_guard<std::mutex> lock(pullersMutex);
+        std::lock_guard lock(pullersMutex);
         // Always remove the puller from our map.
         // If statsd is down, we will not register it when it comes back.
         pullers.erase(atom_tag);

@@ -72,7 +72,7 @@ public:
     // Updates mAllowedLogSources with the latest uids for the packages that are allowed to log.
     void updateLogSources(const sp<UidMap>& uidMap);
 
-    void notifyAppChanged(const string& apk, const sp<UidMap>& uidMap);
+    void notifyAppChanged(const std::string& apk, const sp<UidMap>& uidMap);
 
     /**
      * @brief Update State Tracker depending on #lostAtomId that it was lost due to #reason

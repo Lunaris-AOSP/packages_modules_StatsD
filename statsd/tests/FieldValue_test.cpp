@@ -754,7 +754,7 @@ TEST(AtomMatcherTest, TestWriteDimensionToProto) {
     dim.addValue(FieldValue(field4, value4));
 
     android::util::ProtoOutputStream protoOut;
-    set<int32_t> usedUids;
+    std::set<int32_t> usedUids;
     writeDimensionToProto(dim, /*uidfields*/ {}, nullptr /* include strings */, usedUids,
                           &protoOut);
 
@@ -818,7 +818,7 @@ TEST(AtomMatcherTest, TestWriteDimensionLeafNodesToProto) {
     dim.addValue(FieldValue(field4, value4));
 
     android::util::ProtoOutputStream protoOut;
-    set<int32_t> usedUids;
+    std::set<int32_t> usedUids;
     writeDimensionLeafNodesToProto(dim, 1, /*uidfields*/ {}, nullptr /* include strings */,
                                    usedUids, &protoOut);
 

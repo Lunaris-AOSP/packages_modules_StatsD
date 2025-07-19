@@ -26,6 +26,7 @@
 #include "tests/statsd_test_util.h"
 
 using std::map;
+using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 

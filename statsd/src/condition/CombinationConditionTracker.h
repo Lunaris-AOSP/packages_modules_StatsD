@@ -30,13 +30,13 @@ public:
 
     ~CombinationConditionTracker();
 
-    optional<InvalidConfigReason> init(
+    std::optional<InvalidConfigReason> init(
             const std::vector<Predicate>& allConditionConfig,
             const std::vector<sp<ConditionTracker>>& allConditionTrackers,
             const std::unordered_map<int64_t, int>& conditionIdIndexMap,
             std::vector<uint8_t>& stack, std::vector<ConditionState>& conditionCache) override;
 
-    optional<InvalidConfigReason> onConfigUpdated(
+    std::optional<InvalidConfigReason> onConfigUpdated(
             const std::vector<Predicate>& allConditionProtos, int index,
             const std::vector<sp<ConditionTracker>>& allConditionTrackers,
             const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
@@ -83,9 +83,8 @@ public:
         return mLogicalOperation == LogicalOperation::AND && mSlicedChildren.size() == 1;
     }
 
-    bool equalOutputDimensions(
-        const std::vector<sp<ConditionTracker>>& allConditions,
-        const vector<Matcher>& dimensions) const override;
+    bool equalOutputDimensions(const std::vector<sp<ConditionTracker>>& allConditions,
+                               const std::vector<Matcher>& dimensions) const override;
 
     const std::map<HashableDimensionKey, int>* getSlicedDimensionMap(
             const std::vector<sp<ConditionTracker>>& allConditions) const override {

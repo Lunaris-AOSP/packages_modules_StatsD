@@ -79,7 +79,7 @@ StatsdConfig createHistogramStatsdConfig() {
     *config.add_atom_matcher() = CreateSimpleAtomMatcher("matcher", /* atomId */ 1);
     *config.add_value_metric() =
             createValueMetric("ValueMetric", config.atom_matcher(0), /* valueField */ 1,
-                              /* condition */ nullopt, /* states */ {});
+                              /* condition */ std::nullopt, /* states */ {});
     config.mutable_value_metric(0)->set_aggregation_type(ValueMetric::HISTOGRAM);
 
     return config;
