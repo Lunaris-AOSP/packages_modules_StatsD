@@ -100,12 +100,15 @@ private:
 
     std::shared_ptr<LogEventFilter> mLogEventFilter;
 
-    // Protects mClientSet, mThreadAlive, and ShellSubscriberClient
+    // Protects mClientSet, mThreadAlive, mShouldWakeupThread, and ShellSubscriberClient
     mutable std::mutex mMutex;
 
     std::set<std::unique_ptr<ShellSubscriberClient>> mClientSet;
 
     bool mThreadAlive = false;
+
+    // Used to force wakeup of pullAndSendHeartbeats() thread.
+    bool mShouldWakeupThread = false;
 
     std::condition_variable mThreadSleepCV;
 

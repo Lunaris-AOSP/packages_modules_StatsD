@@ -23,6 +23,7 @@
 #include <private/android_filesystem_config.h>
 
 #include <memory>
+#include <optional>
 
 #include "external/StatsPullerManager.h"
 #include "logd/LogEvent.h"
@@ -43,12 +44,12 @@ namespace statsd {
 class ShellSubscriberClient {
 public:
     struct PullInfo {
-        PullInfo(const SimpleAtomMatcher& matcher, int64_t startTimeMs, int64_t interval,
+        PullInfo(const SimpleAtomMatcher& matcher, int64_t interval,
                  const std::vector<std::string>& packages, const std::vector<int32_t>& uids);
 
         const SimpleAtomMatcher mPullerMatcher;
         const int64_t mIntervalMs;
-        int64_t mPrevPullElapsedRealtimeMs;
+        std::optional<int64_t> mPrevPullElapsedRealtimeMs;
         const std::vector<std::string> mPullPackages;
         const std::vector<int32_t> mPullUids;
     };
