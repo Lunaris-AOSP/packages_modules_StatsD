@@ -93,6 +93,11 @@ bool ShellSubscriber::startNewSubscriptionLocked(unique_ptr<ShellSubscriberClien
             mThread.join();
         }
         mThread = std::thread([this] { pullAndSendHeartbeats(); });
+    } else {
+        // If pullAndSendHeartbeats() thread is sleeping, force a wake-up to trigger the initial
+        // pull for the newly added subscription.
+        mShouldWakeupThread = true;
+        mThreadSleepCV.notify_one();
     }
 
     return true;
@@ -104,6 +109,7 @@ void ShellSubscriber::pullAndSendHeartbeats() {
     std::unique_lock<std::mutex> lock(mMutex);
     while (true) {
         StatsdStats::getInstance().noteSubscriptionPullThreadWakeup();
+        mShouldWakeupThread = false;
         int64_t sleepTimeMs = 24 * 60 * 60 * 1000;  // 24 hours.
         const int64_t nowNanos = getElapsedRealtimeNs();
         const int64_t nowMillis = nanoseconds_to_milliseconds(nowNanos);
@@ -127,7 +133,8 @@ void ShellSubscriber::pullAndSendHeartbeats() {
             return;
         }
         VLOG("ShellSubscriber: helper thread sleeping for %" PRId64 "ms", sleepTimeMs);
-        mThreadSleepCV.wait_for(lock, sleepTimeMs * 1ms, [this] { return mClientSet.empty(); });
+        mThreadSleepCV.wait_for(lock, sleepTimeMs * 1ms,
+                                [this] { return mClientSet.empty() || mShouldWakeupThread; });
     }
 }
 

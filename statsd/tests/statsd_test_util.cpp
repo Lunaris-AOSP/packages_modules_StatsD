@@ -43,6 +43,8 @@ namespace android {
 namespace os {
 namespace statsd {
 
+using namespace std::chrono_literals;
+
 bool StatsServiceConfigTest::sendConfig(const StatsdConfig& config) {
     string str;
     config.SerializeToString(&str);
@@ -2569,6 +2571,24 @@ unique_ptr<LogEvent> createSocketLossInfoLogEvent(int32_t uid, int32_t lossAtomI
     unique_ptr<LogEvent> logEvent = std::make_unique<LogEvent>(uid /* uid */, 0 /* pid */);
     parseStatsEventToLogEvent(statsEvent, logEvent.get());
     return logEvent;
+}
+
+void WaitableEvent::Notify() {
+    std::unique_lock<std::mutex> lock(m_);
+    notified_ = true;
+    cv_.notify_one();
+}
+
+bool WaitableEvent::WaitForNotification() {
+    std::unique_lock<std::mutex> lock(m_);
+    cv_.wait(lock, [this] { return notified_; });
+    return notified_;
+}
+
+bool WaitableEvent::WaitForNotificationWithTimeoutMillis(int millis) {
+    std::unique_lock<std::mutex> lock(m_);
+    cv_.wait_for(lock, millis * 1ms, [this] { return notified_; });
+    return notified_;
 }
 
 }  // namespace statsd
