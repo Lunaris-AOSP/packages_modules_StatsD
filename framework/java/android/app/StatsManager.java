@@ -217,6 +217,10 @@ public final class StatsManager {
         synchronized (sLock) {
             try {
                 IStatsManagerService service = getIStatsManagerServiceLocked();
+                if (service == null) {
+                    Log.e(TAG, "StatsManagerService is null when removing configuration");
+                    throw new StatsUnavailableException("could not connect");
+                }
                 service.removeConfiguration(configKey, mContext.getOpPackageName());
             } catch (RemoteException e) {
                 Log.e(TAG, "Failed to connect to statsmanager when removing configuration");
