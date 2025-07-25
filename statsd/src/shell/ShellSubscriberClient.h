@@ -28,7 +28,7 @@
 #include "external/StatsPullerManager.h"
 #include "logd/LogEvent.h"
 #include "packages/UidMap.h"
-#include "socket/LogEventFilter.h"
+#include "socket/AtomsInUseChangeListener.h"
 #include "src/shell/shell_config.pb.h"
 #include "src/statsd_config.pb.h"
 

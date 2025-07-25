@@ -21,7 +21,6 @@
 #include <atomic>
 #include <cstdint>
 #include <mutex>
-#include <unordered_set>
 
 #include "LogEventFilterUtils.h"
 #include "socket/AtomsInUseChangeListener.h"

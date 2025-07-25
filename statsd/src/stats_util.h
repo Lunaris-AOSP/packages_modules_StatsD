@@ -61,6 +61,11 @@ inline bool isAtLeastU() {
     return isAtLeastU;
 }
 
+inline bool isAtLeastB() {
+    const static bool isAtLeastB = android::modules::sdklevel::IsAtLeastB();
+    return isAtLeastB;
+}
+
 inline bool shouldKeepRandomSample(int samplingPercentage) {
     return (rand() % (100) + 1) <= samplingPercentage;
 }
