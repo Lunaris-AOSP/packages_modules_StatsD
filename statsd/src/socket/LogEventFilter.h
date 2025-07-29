@@ -19,30 +19,24 @@
 #include <gtest/gtest_prod.h>
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
-#include <unordered_map>
 #include <unordered_set>
+
+#include "LogEventFilterUtils.h"
 
 namespace android {
 namespace os {
 namespace statsd {
 
 /**
- * Templating is for benchmarks only
- *
- * Based on benchmarks the more fast container to be used for atom ids filtering
- * is unordered_set<int>
- * #BM_LogEventFilterUnorderedSet                       391208 ns     390086 ns         1793
- * #BM_LogEventFilterUnorderedSet2Consumers            1293527 ns    1289326 ns          543
- * #BM_LogEventFilterSet                                613362 ns     611259 ns         1146
- * #BM_LogEventFilterSet2Consumers                     1859397 ns    1854193 ns          378
- *
- * See @LogEventFilter definition below
+ * Stores superset of atoms ids consumed by various consumers in a thread safe way
+ * Maintains thread-local copy for fast search operations without holding a mutex
+ * on each query
  */
-template <typename T>
-class LogEventFilterGeneric {
+class LogEventFilter {
 public:
-    virtual ~LogEventFilterGeneric() = default;
+    virtual ~LogEventFilter() = default;
 
     virtual void setFilteringEnabled(bool isEnabled) {
         mLogsFilteringEnabled = isEnabled;
@@ -69,14 +63,17 @@ public:
         if (mLocalSetUpdateCounter != mSetUpdateCounter.load(std::memory_order_relaxed)) {
             std::lock_guard guard(mTagIdsMutex);
             mLocalSetUpdateCounter = mSetUpdateCounter.load(std::memory_order_relaxed);
-            mLocalTagIds.swap(mTagIds);
+            // swap provides constant complexity - no copy overhead
+            // the content of mAtomIdsSetManager is invalid after, which is ok
+            // it is not used anywhere else except for thread local cache update
+            mLocalTagIds.swap(mAtomIdsSetManager.getAtomIdsMutable());
         }
-        return mLocalTagIds.find(atomId) != mLocalTagIds.end();
+        return isAtomInSet(mLocalTagIds, atomId);
     }
 
-    typedef const void* ConsumerId;
+    using ConsumerId = const void*;
 
-    typedef T AtomIdSet;
+    using AtomIdSet = std::unordered_set<int32_t>;
     /**
      * @brief Set the Atom Ids object
      *
@@ -85,35 +82,21 @@ public:
      */
     virtual void setAtomIds(AtomIdSet tagIds, ConsumerId consumer) {
         std::lock_guard lock(mTagIdsMutex);
-        // update ids list from consumer
-        if (tagIds.size() == 0) {
-            mTagIdsPerConsumer.erase(consumer);
-        } else {
-            mTagIdsPerConsumer[consumer].swap(tagIds);
-        }
-        // populate the superset incorporating list of distinct atom ids from all consumers
-        mTagIds.clear();
-        for (const auto& [_, atomIds] : mTagIdsPerConsumer) {
-            mTagIds.insert(atomIds.begin(), atomIds.end());
-        }
+        mAtomIdsSetManager.setAtomIds(std::move(tagIds), consumer);
         mSetUpdateCounter.fetch_add(1, std::memory_order_relaxed);
     }
 
 private:
-    std::atomic_bool mLogsFilteringEnabled = false;
-    std::atomic_int mSetUpdateCounter;
-    mutable int mLocalSetUpdateCounter;
+    using AtomIdsSetManager = AtomIdSetManagerBase<AtomIdSet>;
 
+    std::atomic_bool mLogsFilteringEnabled = false;
     mutable std::mutex mTagIdsMutex;
-    std::unordered_map<ConsumerId, AtomIdSet> mTagIdsPerConsumer;
-    mutable AtomIdSet mTagIds;
+    mutable AtomIdsSetManager mAtomIdsSetManager;
+    std::atomic_int mSetUpdateCounter;
+
+    mutable int mLocalSetUpdateCounter;
     mutable AtomIdSet mLocalTagIds;
 
-    friend class LogEventFilterTest;
-
-    FRIEND_TEST(LogEventFilterTest, TestEmptyFilter);
-    FRIEND_TEST(LogEventFilterTest, TestRemoveNonExistingEmptyFilter);
-    FRIEND_TEST(LogEventFilterTest, TestEmptyFilterDisabled);
     FRIEND_TEST(LogEventFilterTest, TestNonEmptyFilterFullOverlap);
     FRIEND_TEST(LogEventFilterTest, TestNonEmptyFilterPartialOverlap);
     FRIEND_TEST(LogEventFilterTest, TestNonEmptyFilterDisabled);
@@ -122,8 +105,6 @@ private:
     FRIEND_TEST(LogEventFilterTest, TestMultipleConsumerOverlapIdsRemoved);
     FRIEND_TEST(LogEventFilterTest, TestMultipleConsumerEmptyFilter);
 };
-
-typedef LogEventFilterGeneric<std::unordered_set<int32_t>> LogEventFilter;
 
 }  // namespace statsd
 }  // namespace os
