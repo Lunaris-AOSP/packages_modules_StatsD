@@ -22,7 +22,6 @@
 #include "external/StatsPullerManager.h"
 #include "hash.h"
 #include "matchers/EventMatcherWizard.h"
-#include "metrics_manager_util.h"
 
 namespace android {
 namespace os {
@@ -35,27 +34,28 @@ using std::optional;
 using std::set;
 using std::string;
 using std::unordered_map;
+using std::unordered_set;
 using std::vector;
 
 // Recursive function to determine if a matcher needs to be updated. Populates matcherUpdateStatus.
 // Returns nullopt if successful and InvalidConfigReason if not.
 optional<InvalidConfigReason> determineMatcherUpdateStatus(
-        const StatsdConfig& config, const int matcherIdx,
+        const StatsdConfig& config, const AtomMatcher& matcher,
         const unordered_map<int64_t, int>& oldAtomMatchingTrackerMap,
         const vector<sp<AtomMatchingTracker>>& oldAtomMatchingTrackers,
-        const unordered_map<int64_t, int>& newAtomMatchingTrackerMap,
-        vector<UpdateStatus>& matcherUpdateStatus, vector<uint8_t>& cycleTracker) {
+        const unordered_map<int64_t, AtomMatcherValue>& allAtomMatcherMap,
+        unordered_map<int64_t, UpdateStatus>& matcherUpdateStatus,
+        unordered_set<int64_t>& cycleTracker) {
+    int64_t id = matcher.id();
     // Have already examined this matcher.
-    if (matcherUpdateStatus[matcherIdx] != UPDATE_UNKNOWN) {
+    if (matcherUpdateStatus.contains(id)) {
         return nullopt;
     }
 
-    const AtomMatcher& matcher = config.atom_matcher(matcherIdx);
-    int64_t id = matcher.id();
     // Check if new matcher.
     const auto& oldAtomMatchingTrackerIt = oldAtomMatchingTrackerMap.find(id);
     if (oldAtomMatchingTrackerIt == oldAtomMatchingTrackerMap.end()) {
-        matcherUpdateStatus[matcherIdx] = UPDATE_NEW;
+        matcherUpdateStatus[id] = UPDATE_NEW;
         return nullopt;
     }
 
@@ -68,52 +68,53 @@ optional<InvalidConfigReason> determineMatcherUpdateStatus(
     }
     uint64_t newProtoHash = Hash64(serializedMatcher);
     if (newProtoHash != oldAtomMatchingTrackers[oldAtomMatchingTrackerIt->second]->getProtoHash()) {
-        matcherUpdateStatus[matcherIdx] = UPDATE_REPLACE;
+        matcherUpdateStatus[id] = UPDATE_REPLACE;
         return nullopt;
     }
 
     optional<InvalidConfigReason> invalidConfigReason;
     switch (matcher.contents_case()) {
         case AtomMatcher::ContentsCase::kSimpleAtomMatcher: {
-            matcherUpdateStatus[matcherIdx] = UPDATE_PRESERVE;
+            matcherUpdateStatus[id] = UPDATE_PRESERVE;
             return nullopt;
         }
         case AtomMatcher::ContentsCase::kCombination: {
             // Recurse to check if children have changed.
-            cycleTracker[matcherIdx] = true;
+            cycleTracker.insert(id);
             UpdateStatus status = UPDATE_PRESERVE;
             for (const int64_t childMatcherId : matcher.combination().matcher()) {
-                const auto& childIt = newAtomMatchingTrackerMap.find(childMatcherId);
-                if (childIt == newAtomMatchingTrackerMap.end()) {
+                const auto& childIt = allAtomMatcherMap.find(childMatcherId);
+                if (childIt == allAtomMatcherMap.end()) {
                     ALOGW("Matcher %lld not found in the config", (long long)childMatcherId);
                     invalidConfigReason = createInvalidConfigReasonWithMatcher(
                             INVALID_CONFIG_REASON_MATCHER_CHILD_NOT_FOUND, id);
                     invalidConfigReason->matcherIds.push_back(childMatcherId);
                     return invalidConfigReason;
                 }
-                const int childIdx = childIt->second;
-                if (cycleTracker[childIdx]) {
+                const int64_t childId = childIt->first;
+                if (cycleTracker.contains(childId)) {
                     ALOGE("Cycle detected in matcher config");
                     invalidConfigReason = createInvalidConfigReasonWithMatcher(
                             INVALID_CONFIG_REASON_MATCHER_CYCLE, id);
-                    invalidConfigReason->matcherIds.push_back(childMatcherId);
+                    invalidConfigReason->matcherIds.push_back(childId);
                     return invalidConfigReason;
                 }
                 invalidConfigReason = determineMatcherUpdateStatus(
-                        config, childIdx, oldAtomMatchingTrackerMap, oldAtomMatchingTrackers,
-                        newAtomMatchingTrackerMap, matcherUpdateStatus, cycleTracker);
+                        config, childIt->second.atomMatcher, oldAtomMatchingTrackerMap,
+                        oldAtomMatchingTrackers, allAtomMatcherMap, matcherUpdateStatus,
+                        cycleTracker);
                 if (invalidConfigReason.has_value()) {
                     invalidConfigReason->matcherIds.push_back(id);
                     return invalidConfigReason;
                 }
 
-                if (matcherUpdateStatus[childIdx] == UPDATE_REPLACE) {
+                if (matcherUpdateStatus[childId] == UPDATE_REPLACE) {
                     status = UPDATE_REPLACE;
                     break;
                 }
             }
-            matcherUpdateStatus[matcherIdx] = status;
-            cycleTracker[matcherIdx] = false;
+            matcherUpdateStatus[id] = status;
+            cycleTracker.erase(id);
             return nullopt;
         }
         default: {
@@ -125,96 +126,132 @@ optional<InvalidConfigReason> determineMatcherUpdateStatus(
     return nullopt;
 }
 
-optional<InvalidConfigReason> updateAtomMatchingTrackers(
+bool updateAtomMatchingTrackers(
         const StatsdConfig& config, const sp<UidMap>& uidMap,
         const unordered_map<int64_t, int>& oldAtomMatchingTrackerMap,
         const vector<sp<AtomMatchingTracker>>& oldAtomMatchingTrackers,
         std::unordered_map<int, std::vector<int>>& allTagIdsToMatchersMap,
         unordered_map<int64_t, int>& newAtomMatchingTrackerMap,
-        vector<sp<AtomMatchingTracker>>& newAtomMatchingTrackers, set<int64_t>& replacedMatchers) {
-    const int atomMatcherCount = config.atom_matcher_size();
-    vector<AtomMatcher> matcherProtos;
-    matcherProtos.reserve(atomMatcherCount);
-    newAtomMatchingTrackers.reserve(atomMatcherCount);
+        vector<sp<AtomMatchingTracker>>& newAtomMatchingTrackers, set<int64_t>& replacedMatchers,
+        unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities) {
+    bool allTrackersValid = true;
+    unordered_map<int64_t, AtomMatcherValue> allAtomMatcherMap;
     optional<InvalidConfigReason> invalidConfigReason;
+    newAtomMatchingTrackers.reserve(
+            config.atom_matcher_size());  // Always reserve the max since errors are rare.
 
     // Maps matcher id to their position in the config. For fast lookup of dependencies.
-    for (int i = 0; i < atomMatcherCount; i++) {
+    for (int i = 0; i < config.atom_matcher_size(); i++) {
         const AtomMatcher& matcher = config.atom_matcher(i);
-        if (newAtomMatchingTrackerMap.find(matcher.id()) != newAtomMatchingTrackerMap.end()) {
+        if (allAtomMatcherMap.find(matcher.id()) != allAtomMatcherMap.end()) {
+            allTrackersValid = false;
             ALOGE("Duplicate atom matcher found for id %lld", (long long)matcher.id());
-            return createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_MATCHER_DUPLICATE,
-                                                        matcher.id());
+            invalidEntities[{matcher.id(), INVALID_ENTITY_TYPE_MATCHER}] =
+                    createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_MATCHER_DUPLICATE,
+                                                         matcher.id());
         }
-        newAtomMatchingTrackerMap[matcher.id()] = i;
-        matcherProtos.push_back(matcher);
+        allAtomMatcherMap[matcher.id()] = {matcher, nullptr};
     }
 
     // For combination matchers, we need to determine if any children need to be updated.
-    vector<UpdateStatus> matcherUpdateStatus(atomMatcherCount, UPDATE_UNKNOWN);
-    vector<uint8_t> cycleTracker(atomMatcherCount, false);
-    for (int i = 0; i < atomMatcherCount; i++) {
+    unordered_map<int64_t, UpdateStatus> matcherUpdateStatus;
+    unordered_set<int64_t> cycleTracker;
+    for (const auto& [id, atomMatcherValue] : allAtomMatcherMap) {
+        cycleTracker.clear();
         invalidConfigReason = determineMatcherUpdateStatus(
-                config, i, oldAtomMatchingTrackerMap, oldAtomMatchingTrackers,
-                newAtomMatchingTrackerMap, matcherUpdateStatus, cycleTracker);
+                config, atomMatcherValue.atomMatcher, oldAtomMatchingTrackerMap,
+                oldAtomMatchingTrackers, allAtomMatcherMap, matcherUpdateStatus, cycleTracker);
         if (invalidConfigReason.has_value()) {
-            return invalidConfigReason;
+            invalidEntities[{id, INVALID_ENTITY_TYPE_MATCHER}] = invalidConfigReason.value();
         }
     }
 
-    for (int i = 0; i < atomMatcherCount; i++) {
-        const AtomMatcher& matcher = config.atom_matcher(i);
-        const int64_t id = matcher.id();
-        switch (matcherUpdateStatus[i]) {
+    for (auto& [id, atomMatcherValue] : allAtomMatcherMap) {
+        switch (matcherUpdateStatus[id]) {
             case UPDATE_PRESERVE: {
                 const auto& oldAtomMatchingTrackerIt = oldAtomMatchingTrackerMap.find(id);
                 if (oldAtomMatchingTrackerIt == oldAtomMatchingTrackerMap.end()) {
                     ALOGE("Could not find AtomMatcher %lld in the previous config, but expected it "
                           "to be there",
                           (long long)id);
-                    return createInvalidConfigReasonWithMatcher(
-                            INVALID_CONFIG_REASON_MATCHER_NOT_IN_PREV_CONFIG, id);
+                    invalidEntities[{id, INVALID_ENTITY_TYPE_MATCHER}] =
+                            createInvalidConfigReasonWithMatcher(
+                                    INVALID_CONFIG_REASON_MATCHER_NOT_IN_PREV_CONFIG, id);
+                    break;
                 }
                 const sp<AtomMatchingTracker>& tracker =
                         oldAtomMatchingTrackers[oldAtomMatchingTrackerIt->second];
-                invalidConfigReason =
-                        tracker->onConfigUpdated(matcherProtos[i], newAtomMatchingTrackerMap);
-                if (invalidConfigReason.has_value()) {
-                    ALOGW("Config update failed for matcher %lld", (long long)id);
-                    return invalidConfigReason;
-                }
-                newAtomMatchingTrackers.push_back(tracker);
+                atomMatcherValue.atomMatchingTracker = tracker;
                 break;
             }
             case UPDATE_REPLACE:
                 replacedMatchers.insert(id);
                 [[fallthrough]];  // Intentionally fallthrough to create the new matcher.
             case UPDATE_NEW: {
-                sp<AtomMatchingTracker> tracker =
-                        createAtomMatchingTracker(matcher, uidMap, invalidConfigReason);
+                sp<AtomMatchingTracker> tracker = createAtomMatchingTracker(
+                        atomMatcherValue.atomMatcher, uidMap, invalidConfigReason);
                 if (tracker == nullptr) {
-                    return invalidConfigReason;
+                    allTrackersValid = false;
+                    if (invalidConfigReason.has_value()) {
+                        invalidEntities[{id, INVALID_ENTITY_TYPE_MATCHER}] =
+                                invalidConfigReason.value();
+                    } else {
+                        // Should never happen
+                        invalidEntities[{id, INVALID_ENTITY_TYPE_MATCHER}] =
+                                createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_UNKNOWN,
+                                                                     id);
+                    }
                 }
-                newAtomMatchingTrackers.push_back(tracker);
+                atomMatcherValue.atomMatchingTracker = tracker;
                 break;
             }
             default: {
+                if (invalidEntities.contains({id, INVALID_ENTITY_TYPE_MATCHER})) {
+                    // Invalid matchers may not have an update state set.
+                    break;
+                }
+                allTrackersValid = false;
                 ALOGE("Matcher \"%lld\" update state is unknown. This should never happen",
                       (long long)id);
-                return createInvalidConfigReasonWithMatcher(
-                        INVALID_CONFIG_REASON_MATCHER_UPDATE_STATUS_UNKNOWN, id);
+                invalidEntities[{id, INVALID_ENTITY_TYPE_MATCHER}] =
+                        createInvalidConfigReasonWithMatcher(
+                                INVALID_CONFIG_REASON_MATCHER_UPDATE_STATUS_UNKNOWN, id);
             }
         }
     }
 
-    std::fill(cycleTracker.begin(), cycleTracker.end(), false);
+    for (const auto& [id, atomMatcherValue] : allAtomMatcherMap) {
+        if (atomMatcherValue.atomMatchingTracker == nullptr) {
+            continue;
+        }
+        cycleTracker.clear();
+        const auto [invalidReason, _] = atomMatcherValue.atomMatchingTracker->isTrackerValid(
+                allAtomMatcherMap, cycleTracker);
+        if (invalidReason.has_value()) {
+            allTrackersValid = false;
+            invalidEntities[{atomMatcherValue.atomMatchingTracker->getId(),
+                             INVALID_ENTITY_TYPE_MATCHER}] = invalidReason.value();
+        }
+    }
+
+    // Iterate through the matchers from the original config to guarantee consistent order.
+    int outIndex = 0;
+    for (const auto& matcher : config.atom_matcher()) {
+        if (invalidEntities.find({matcher.id(), INVALID_ENTITY_TYPE_MATCHER}) ==
+            invalidEntities.end()) {
+            newAtomMatchingTrackerMap[matcher.id()] = outIndex;
+            newAtomMatchingTrackers.push_back(allAtomMatcherMap[matcher.id()].atomMatchingTracker);
+            ++outIndex;
+        }
+    }
+
     for (size_t matcherIndex = 0; matcherIndex < newAtomMatchingTrackers.size(); matcherIndex++) {
         auto& matcher = newAtomMatchingTrackers[matcherIndex];
-        const auto [invalidConfigReason, _] =
-                matcher->init(matcherIndex, matcherProtos, newAtomMatchingTrackers,
-                              newAtomMatchingTrackerMap, cycleTracker);
-        if (invalidConfigReason.has_value()) {
-            return invalidConfigReason;
+        if (matcherUpdateStatus[matcher->getId()] == UPDATE_PRESERVE) {
+            matcher->onConfigUpdated(allAtomMatcherMap[matcher->getId()].atomMatcher,
+                                     newAtomMatchingTrackerMap);
+        } else {
+            matcher->init(allAtomMatcherMap, newAtomMatchingTrackerMap);
         }
 
         // Collect all the tag ids that are interesting. TagIds exist in leaf nodes only.
@@ -235,7 +272,7 @@ optional<InvalidConfigReason> updateAtomMatchingTrackers(
         }
     }
 
-    return nullopt;
+    return allTrackersValid;
 }
 
 // Recursive function to determine if a condition needs to be updated. Populates
@@ -1242,6 +1279,8 @@ optional<InvalidConfigReason> updateStatsdConfig(
     vector<ConditionState> conditionCache;
     unordered_map<int64_t, int> stateAtomIdMap;
     unordered_map<int64_t, unordered_map<int, int64_t>> allStateGroupMaps;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    optional<InvalidConfigReason> invalidConfigReason;
 
     if (config.package_certificate_hash_size_bytes() > UINT8_MAX) {
         ALOGE("Invalid value for package_certificate_hash_size_bytes: %d",
@@ -1249,13 +1288,13 @@ optional<InvalidConfigReason> updateStatsdConfig(
         return InvalidConfigReason(INVALID_CONFIG_REASON_PACKAGE_CERT_HASH_SIZE_TOO_LARGE);
     }
 
-    optional<InvalidConfigReason> invalidConfigReason = updateAtomMatchingTrackers(
+    bool allTrackersValid = updateAtomMatchingTrackers(
             config, uidMap, oldAtomMatchingTrackerMap, oldAtomMatchingTrackers,
             allTagIdsToMatchersMap, newAtomMatchingTrackerMap, newAtomMatchingTrackers,
-            replacedMatchers);
-    if (invalidConfigReason.has_value()) {
+            replacedMatchers, invalidEntities);
+    if (!allTrackersValid) {
         ALOGE("updateAtomMatchingTrackers failed");
-        return invalidConfigReason;
+        return invalidEntities.begin()->second;
     }
 
     invalidConfigReason = updateConditions(

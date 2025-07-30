@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <utils/JenkinsHash.h>
+
 #include <set>
 #include <unordered_map>
 #include <vector>
@@ -30,6 +32,20 @@
 namespace android {
 namespace os {
 namespace statsd {
+
+enum InvalidEntityType {
+    INVALID_ENTITY_TYPE_UNKNOWN = 0,
+    INVALID_ENTITY_TYPE_MATCHER = 1,
+};
+
+struct InvalidEntityKey {
+    int64_t id;
+    InvalidEntityType entityType;
+
+    bool operator==(const InvalidEntityKey& other) const {
+        return id == other.id && entityType == other.entityType;
+    }
+};
 
 // Helper functions for creating, validating, and updating config components from StatsdConfig.
 // Should only be called from metrics_manager_util and config_update_utils.
@@ -291,12 +307,14 @@ std::optional<InvalidConfigReason> initSubscribersForSubscriptionType(
 // [atomMatchingTrackerMap]: this map should contain matcher name to index mapping
 // [allAtomMatchingTrackers]: should store the sp to all the AtomMatchingTracker
 // [allTagIdsToMatchersMap]: maps of tag ids to atom matchers
-// Returns nullopt if successful and InvalidConfigReason if not.
-std::optional<InvalidConfigReason> initAtomMatchingTrackers(
+// [invalidEntities]: map of entity id to a reason why the entity is invalid
+// Returns true if all matchers are valid
+bool initAtomMatchingTrackers(
         const StatsdConfig& config, const sp<UidMap>& uidMap,
         std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
         std::vector<sp<AtomMatchingTracker>>& allAtomMatchingTrackers,
-        std::unordered_map<int, std::vector<int>>& allTagIdsToMatchersMap);
+        std::unordered_map<int, std::vector<int>>& allTagIdsToMatchersMap,
+        std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 // Initialize ConditionTrackers
 // input:
@@ -402,3 +420,13 @@ std::optional<InvalidConfigReason> initStatsdConfig(
 }  // namespace statsd
 }  // namespace os
 }  // namespace android
+
+template <>
+struct std::hash<android::os::statsd::InvalidEntityKey> {
+    std::size_t operator()(const android::os::statsd::InvalidEntityKey& invalidEntityKey) const {
+        android::hash_t hash = 0;
+        hash = android::JenkinsHashMix(hash, android::hash_type((int64_t)invalidEntityKey.id));
+        hash = android::JenkinsHashMix(hash, android::hash_type((int)invalidEntityKey.entityType));
+        return JenkinsHashWhiten(hash);
+    }
+};

@@ -33,6 +33,8 @@ namespace android {
 namespace os {
 namespace statsd {
 
+using std::vector;
+
 InitConfigTest::InitConfigTest() : uidMap(new UidMap()), pullerManager(new StatsPullerManager()) {
 }
 
@@ -67,6 +69,21 @@ std::optional<InvalidConfigReason> InitConfigTest::initConfig(const StatsdConfig
             allAlarmTrackers, conditionToMetricMap, trackerToMetricMap, trackerToConditionMap,
             activationAtomTrackerToMetricMap, deactivationAtomTrackerToMetricMap, alertTrackerMap,
             metricsWithActivation, stateProtoHashes, noReportMetricIds);
+}
+
+vector<int> filterMatcherIndexesById(const vector<sp<AtomMatchingTracker>>& atomMatchingTrackers,
+                                     const vector<int64_t>& ids) {
+    vector<int> result;
+
+    for (auto& id : ids) {
+        for (int i = 0; i < atomMatchingTrackers.size(); i++) {
+            if (atomMatchingTrackers[i]->getId() == id) {
+                result.push_back(i);
+            }
+        }
+    }
+
+    return result;
 }
 
 void InitConfigTest::SetUp() {

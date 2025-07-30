@@ -25,6 +25,7 @@
 #include "external/StatsPullerManager.h"
 #include "matchers/AtomMatchingTracker.h"
 #include "metrics/MetricProducer.h"
+#include "metrics_manager_util.h"
 
 namespace android {
 namespace os {
@@ -37,21 +38,23 @@ namespace statsd {
 // Recursive function to determine if a matcher needs to be updated.
 // input:
 // [config]: the input StatsdConfig
-// [matcherIdx]: the index of the current matcher to be updated
+// [matcher]: the current matcher to be updated
 // [oldAtomMatchingTrackerMap]: matcher id to index mapping in the existing MetricsManager
 // [oldAtomMatchingTrackers]: stores the existing AtomMatchingTrackers
-// [newAtomMatchingTrackerMap]: matcher id to index mapping in the input StatsdConfig
+// [allAtomMatcherMap]: matcher id to atom matcher mapping in the input StatsdConfig
 // output:
-// [matchersToUpdate]: vector of the update status of each matcher. The matcherIdx index will
+// [matchersToUpdate]: map of the matcherId to update status of each matcher. The matcher status
+// will
 //                     be updated from UPDATE_UNKNOWN after this call.
 // [cycleTracker]: intermediate param used during recursion.
 // Returns nullopt if successful and InvalidConfigReason if not.
 std::optional<InvalidConfigReason> determineMatcherUpdateStatus(
-        const StatsdConfig& config, int matcherIdx,
+        const StatsdConfig& config, const AtomMatcher& matcher,
         const std::unordered_map<int64_t, int>& oldAtomMatchingTrackerMap,
         const std::vector<sp<AtomMatchingTracker>>& oldAtomMatchingTrackers,
-        const std::unordered_map<int64_t, int>& newAtomMatchingTrackerMap,
-        std::vector<UpdateStatus>& matchersToUpdate, std::vector<uint8_t>& cycleTracker);
+        const std::unordered_map<int64_t, AtomMatcherValue>& allAtomMatcherMap,
+        std::unordered_map<int64_t, UpdateStatus>& matchersToUpdate,
+        std::unordered_set<int64_t>& cycleTracker);
 
 // Updates the AtomMatchingTrackers.
 // input:
@@ -63,15 +66,17 @@ std::optional<InvalidConfigReason> determineMatcherUpdateStatus(
 // [newAtomMatchingTrackerMap]: new matcher id to index mapping
 // [newAtomMatchingTrackers]: stores the new AtomMatchingTrackers
 // [replacedMatchers]: set of matcher ids that changed and have been replaced
-// Returns nullopt if successful and InvalidConfigReason if not.
-std::optional<InvalidConfigReason> updateAtomMatchingTrackers(
+// [invalidEntities]: a map of entity id to the reason why the entity is invalid
+// Returns true is all atom matchers are valid.
+bool updateAtomMatchingTrackers(
         const StatsdConfig& config, const sp<UidMap>& uidMap,
         const std::unordered_map<int64_t, int>& oldAtomMatchingTrackerMap,
         const std::vector<sp<AtomMatchingTracker>>& oldAtomMatchingTrackers,
         std::unordered_map<int, std::vector<int>>& allTagIdsToMatchersMap,
         std::unordered_map<int64_t, int>& newAtomMatchingTrackerMap,
         std::vector<sp<AtomMatchingTracker>>& newAtomMatchingTrackers,
-        std::set<int64_t>& replacedMatchers);
+        std::set<int64_t>& replacedMatchers,
+        std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 // Recursive function to determine if a condition needs to be updated.
 // input:

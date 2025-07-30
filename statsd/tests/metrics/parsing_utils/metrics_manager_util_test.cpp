@@ -404,7 +404,6 @@ TEST_F(MetricsManagerUtilTest, TestCircleLogMatcherDependency) {
     optional<InvalidConfigReason> expectedInvalidConfigReason =
             createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_MATCHER_CYCLE,
                                                  StringToId("SCREEN_ON_OR_OFF"));
-    expectedInvalidConfigReason->matcherIds.push_back(StringToId("SCREEN_ON_OR_OFF"));
 
     EXPECT_EQ(initConfig(buildCircleMatchers()), expectedInvalidConfigReason);
 }
@@ -1385,7 +1384,6 @@ TEST_F(MetricsManagerUtilTest, TestCreateAtomMatchingTrackerSimple) {
     EXPECT_NE(tracker, nullptr);
     EXPECT_EQ(invalidConfigReason, nullopt);
 
-    EXPECT_TRUE(tracker->mInitialized);
     EXPECT_EQ(tracker->getId(), id);
     const set<int>& atomIds = tracker->getAtomIds();
     ASSERT_EQ(atomIds.size(), 1);
@@ -1409,7 +1407,6 @@ TEST_F(MetricsManagerUtilTest, TestCreateAtomMatchingTrackerCombination) {
     EXPECT_EQ(invalidConfigReason, nullopt);
 
     // Combination matchers need to be initialized first.
-    EXPECT_FALSE(tracker->mInitialized);
     EXPECT_EQ(tracker->getId(), id);
     const set<int>& atomIds = tracker->getAtomIds();
     ASSERT_EQ(atomIds.size(), 0);
@@ -2134,7 +2131,6 @@ TEST_F(MetricsManagerUtilTest, TestMissingValueMatcherAndStringReplacer) {
     matcher->mutable_simple_atom_matcher()->add_field_value_matcher();
 
     optional<InvalidConfigReason> actualInvalidConfigReason = initConfig(config);
-
     ASSERT_NE(actualInvalidConfigReason, nullopt);
     EXPECT_EQ(actualInvalidConfigReason->reason,
               INVALID_CONFIG_REASON_MATCHER_NO_VALUE_MATCHER_NOR_STRING_REPLACER);
@@ -2691,6 +2687,150 @@ TEST_F(MetricsManagerUtilTest, TestMetricHasRepeatedUidField_PositionANY) {
 
     EXPECT_EQ(initConfig(config),
               InvalidConfigReason(INVALID_CONFIG_REASON_UID_FIELDS_WITH_POSITION_ANY, metric.id()));
+}
+
+TEST_F(MetricsManagerUtilTest, TestInitMatchersNotesMultipleInvalidEntities) {
+    StatsdConfig config;
+
+    AtomMatcher simple1 = CreateSimpleAtomMatcher("SIMPLE1", /*atom=*/10);
+    int64_t simple1Id = simple1.id();
+    *config.add_atom_matcher() = simple1;
+
+    // duplicate to simple1
+    AtomMatcher simple2 = CreateSimpleAtomMatcher("SIMPLE1", /*atom=*/10);
+    *config.add_atom_matcher() = simple2;
+
+    // No atom matcher id.
+    AtomMatcher simple3 = CreateSimpleAtomMatcher("SIMPLE3", /*atom=*/12);
+    simple3.mutable_simple_atom_matcher()->clear_atom_id();
+    *config.add_atom_matcher() = simple3;
+
+    // valid matcher
+    AtomMatcher simple4 = CreateSimpleAtomMatcher("SIMPLE4", /*atom=*/13);
+    *config.add_atom_matcher() = simple4;
+
+    unordered_map<int, vector<int>> tagIds;
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    vector<sp<AtomMatchingTracker>> newAtomMatchingTrackers;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+
+    EXPECT_FALSE(initAtomMatchingTrackers(config, uidMap, newAtomMatchingTrackerMap,
+                                          newAtomMatchingTrackers, tagIds, invalidEntities));
+
+    EXPECT_EQ(invalidEntities.size(), 2);
+    EXPECT_EQ(invalidEntities[(InvalidEntityKey{simple1.id(), INVALID_ENTITY_TYPE_MATCHER})],
+              createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_MATCHER_DUPLICATE,
+                                                   simple1.id()));
+    EXPECT_EQ(invalidEntities[(InvalidEntityKey{simple3.id(), INVALID_ENTITY_TYPE_MATCHER})],
+              createInvalidConfigReasonWithMatcher(
+                      INVALID_CONFIG_REASON_MATCHER_TRACKER_NOT_INITIALIZED, simple3.id()));
+
+    EXPECT_EQ(newAtomMatchingTrackerMap.size(), 1);
+    EXPECT_EQ(newAtomMatchingTrackerMap[simple4.id()], 0);
+    EXPECT_EQ(newAtomMatchingTrackers[0]->getId(), simple4.id());
+    EXPECT_EQ(tagIds.size(), 1);
+    EXPECT_THAT(tagIds[13], UnorderedElementsAreArray(filterMatcherIndexesById(
+                                    newAtomMatchingTrackers, {simple4.id()})));
+}
+
+TEST_F(MetricsManagerUtilTest, TestInitMatchersHasCycle) {
+    StatsdConfig config;
+
+    AtomMatcher matcher1;
+    matcher1.set_id(StringToId("TEST1"));
+    AtomMatcher matcher2;
+    matcher2.set_id(StringToId("TEST2"));
+    AtomMatcher matcher3 = CreateSimpleAtomMatcher("SIMPLE1", /*atom=*/10);
+
+    AtomMatcher_Combination* combination1 = matcher1.mutable_combination();
+    combination1->set_operation(LogicalOperation::OR);
+    combination1->add_matcher(matcher2.id());
+    combination1->add_matcher(matcher3.id());
+
+    AtomMatcher_Combination* combination2 = matcher2.mutable_combination();
+    combination2->set_operation(LogicalOperation::OR);
+    combination2->add_matcher(matcher1.id());
+    combination2->add_matcher(matcher3.id());
+
+    *config.add_atom_matcher() = matcher1;
+    *config.add_atom_matcher() = matcher2;
+    *config.add_atom_matcher() = matcher3;
+
+    unordered_map<int, vector<int>> tagIds;
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    vector<sp<AtomMatchingTracker>> newAtomMatchingTrackers;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_FALSE(initAtomMatchingTrackers(config, uidMap, newAtomMatchingTrackerMap,
+                                          newAtomMatchingTrackers, tagIds, invalidEntities));
+
+    EXPECT_EQ(invalidEntities.size(), 2);
+    InvalidConfigReason reason =
+            invalidEntities[InvalidEntityKey{matcher1.id(), INVALID_ENTITY_TYPE_MATCHER}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_MATCHER_CYCLE);
+    EXPECT_THAT(reason.matcherIds, UnorderedElementsAreArray({matcher1.id(), matcher2.id()}));
+
+    reason = invalidEntities[InvalidEntityKey{matcher2.id(), INVALID_ENTITY_TYPE_MATCHER}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_MATCHER_CYCLE);
+    EXPECT_THAT(reason.matcherIds, UnorderedElementsAreArray({matcher1.id(), matcher2.id()}));
+
+    EXPECT_EQ(newAtomMatchingTrackerMap.size(), 1);
+    EXPECT_EQ(newAtomMatchingTrackerMap[matcher3.id()], 0);
+    EXPECT_EQ(newAtomMatchingTrackers[0]->getId(), matcher3.id());
+
+    EXPECT_EQ(tagIds.size(), 1);
+    EXPECT_THAT(tagIds[10], UnorderedElementsAreArray(filterMatcherIndexesById(
+                                    newAtomMatchingTrackers, {matcher3.id()})));
+}
+
+TEST_F(MetricsManagerUtilTest, TestInitMatchersNoCycle) {
+    StatsdConfig config;
+
+    AtomMatcher matcher1 = CreateSimpleAtomMatcher("SIMPLE1", /*atom=*/10);
+    AtomMatcher matcher2 = CreateSimpleAtomMatcher("SIMPLE2", /*atom=*/11);
+    AtomMatcher matcher3 = CreateSimpleAtomMatcher("SIMPLE3", /*atom=*/12);
+    AtomMatcher matcher4;
+    matcher4.set_id(StringToId("TEST1"));
+    AtomMatcher matcher5;
+    matcher5.set_id(StringToId("TEST2"));
+
+    AtomMatcher_Combination* combination1 = matcher4.mutable_combination();
+    combination1->set_operation(LogicalOperation::OR);
+    combination1->add_matcher(matcher1.id());
+    combination1->add_matcher(matcher2.id());
+
+    AtomMatcher_Combination* combination2 = matcher5.mutable_combination();
+    combination2->set_operation(LogicalOperation::OR);
+    combination2->add_matcher(matcher1.id());
+    combination2->add_matcher(matcher3.id());
+
+    *config.add_atom_matcher() = matcher1;
+    *config.add_atom_matcher() = matcher2;
+    *config.add_atom_matcher() = matcher3;
+    *config.add_atom_matcher() = matcher4;
+    *config.add_atom_matcher() = matcher5;
+
+    unordered_map<int, vector<int>> tagIds;
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    vector<sp<AtomMatchingTracker>> newAtomMatchingTrackers;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_TRUE(initAtomMatchingTrackers(config, uidMap, newAtomMatchingTrackerMap,
+                                         newAtomMatchingTrackers, tagIds, invalidEntities));
+
+    EXPECT_EQ(newAtomMatchingTrackerMap.size(), 5);
+    EXPECT_EQ(newAtomMatchingTrackerMap.at(matcher1.id()), 0);
+    EXPECT_EQ(newAtomMatchingTrackerMap.at(matcher2.id()), 1);
+    EXPECT_EQ(newAtomMatchingTrackerMap.at(matcher3.id()), 2);
+    EXPECT_EQ(newAtomMatchingTrackerMap.at(matcher4.id()), 3);
+    EXPECT_EQ(newAtomMatchingTrackerMap.at(matcher5.id()), 4);
+
+    EXPECT_EQ(tagIds.size(), 3);
+    EXPECT_THAT(tagIds[10],
+                UnorderedElementsAreArray(filterMatcherIndexesById(
+                        newAtomMatchingTrackers, {matcher1.id(), matcher4.id(), matcher5.id()})));
+    EXPECT_THAT(tagIds[11], UnorderedElementsAreArray(filterMatcherIndexesById(
+                                    newAtomMatchingTrackers, {matcher2.id(), matcher4.id()})));
+    EXPECT_THAT(tagIds[12], UnorderedElementsAreArray(filterMatcherIndexesById(
+                                    newAtomMatchingTrackers, {matcher3.id(), matcher5.id()})));
 }
 
 }  // namespace statsd

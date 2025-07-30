@@ -57,6 +57,7 @@ using std::shared_ptr;
 using std::string;
 using std::to_string;
 using std::unordered_map;
+using std::unordered_set;
 using std::vector;
 
 namespace {
@@ -1620,44 +1621,71 @@ optional<sp<AnomalyTracker>> createAnomalyTracker(
     return {anomalyTracker};
 }
 
-optional<InvalidConfigReason> initAtomMatchingTrackers(
+bool initAtomMatchingTrackers(
         const StatsdConfig& config, const sp<UidMap>& uidMap,
-        unordered_map<int64_t, int>& atomMatchingTrackerMap,
+        unordered_map<int64_t, int>& validAtomMatchingTrackerMap,
         vector<sp<AtomMatchingTracker>>& allAtomMatchingTrackers,
-        unordered_map<int, vector<int>>& allTagIdsToMatchersMap) {
-    vector<AtomMatcher> matcherConfigs;
-    const int atomMatcherCount = config.atom_matcher_size();
-    matcherConfigs.reserve(atomMatcherCount);
-    allAtomMatchingTrackers.reserve(atomMatcherCount);
+        unordered_map<int, vector<int>>& allTagIdsToMatchersMap,
+        unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities) {
+    bool allMatchersValid = true;
+    unordered_map<int64_t, AtomMatcherValue> allAtomMatcherMap;
     optional<InvalidConfigReason> invalidConfigReason;
 
-    for (int i = 0; i < atomMatcherCount; i++) {
+    for (int i = 0; i < config.atom_matcher_size(); i++) {
         const AtomMatcher& logMatcher = config.atom_matcher(i);
+        if (allAtomMatcherMap.find(logMatcher.id()) != allAtomMatcherMap.end()) {
+            ALOGE("Duplicate AtomMatcher found!");
+            allMatchersValid = false;
+            invalidEntities[{logMatcher.id(), INVALID_ENTITY_TYPE_MATCHER}] =
+                    createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_MATCHER_DUPLICATE,
+                                                         logMatcher.id());
+            continue;
+        }
         sp<AtomMatchingTracker> tracker =
                 createAtomMatchingTracker(logMatcher, uidMap, invalidConfigReason);
         if (tracker == nullptr) {
-            return invalidConfigReason;
+            allMatchersValid = false;
+            if (invalidConfigReason.has_value()) {
+                invalidEntities[{logMatcher.id(), INVALID_ENTITY_TYPE_MATCHER}] =
+                        invalidConfigReason.value();
+            } else {
+                // Should never happen
+                invalidEntities[{logMatcher.id(), INVALID_ENTITY_TYPE_MATCHER}] =
+                        createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_UNKNOWN,
+                                                             logMatcher.id());
+            }
+            continue;
         }
-        allAtomMatchingTrackers.push_back(tracker);
-        if (atomMatchingTrackerMap.find(logMatcher.id()) != atomMatchingTrackerMap.end()) {
-            ALOGE("Duplicate AtomMatcher found!");
-            return createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_MATCHER_DUPLICATE,
-                                                        logMatcher.id());
-        }
-        atomMatchingTrackerMap[logMatcher.id()] = i;
-        matcherConfigs.push_back(logMatcher);
+        allAtomMatcherMap[logMatcher.id()] = {logMatcher, tracker};
     }
 
-    vector<uint8_t> stackTracker2(allAtomMatchingTrackers.size(), false);
+    unordered_set<int64_t> stackTracker;
+    for (const auto& [id, atomMatcherValue] : allAtomMatcherMap) {
+        stackTracker.clear();
+        const auto [invalidReason, _] = atomMatcherValue.atomMatchingTracker->isTrackerValid(
+                allAtomMatcherMap, stackTracker);
+        if (invalidReason.has_value()) {
+            allMatchersValid = false;
+            invalidEntities[{id, INVALID_ENTITY_TYPE_MATCHER}] = invalidReason.value();
+        }
+    }
+
+    // Reserve the maximum amount since invalid entities are rare.
+    allAtomMatchingTrackers.reserve(config.atom_matcher_size());
+    // Iterate through the matchers from the original config to guarantee consistent order.
+    int outIndex = 0;
+    for (const auto& matcher : config.atom_matcher()) {
+        if (invalidEntities.find({matcher.id(), INVALID_ENTITY_TYPE_MATCHER}) ==
+            invalidEntities.end()) {
+            validAtomMatchingTrackerMap[matcher.id()] = outIndex;
+            allAtomMatchingTrackers.push_back(allAtomMatcherMap[matcher.id()].atomMatchingTracker);
+            ++outIndex;
+        }
+    }
+
     for (size_t matcherIndex = 0; matcherIndex < allAtomMatchingTrackers.size(); matcherIndex++) {
         auto& matcher = allAtomMatchingTrackers[matcherIndex];
-        const auto [invalidConfigReason, _] =
-                matcher->init(matcherIndex, matcherConfigs, allAtomMatchingTrackers,
-                              atomMatchingTrackerMap, stackTracker2);
-        if (invalidConfigReason.has_value()) {
-            return invalidConfigReason;
-        }
-
+        matcher->init(allAtomMatcherMap, validAtomMatchingTrackerMap);
         // Collect all the tag ids that are interesting. TagIds exist in leaf nodes only.
         const set<int>& tagIds = matcher->getAtomIds();
         for (int atomId : tagIds) {
@@ -1676,7 +1704,7 @@ optional<InvalidConfigReason> initAtomMatchingTrackers(
         }
     }
 
-    return nullopt;
+    return allMatchersValid;
 }
 
 optional<InvalidConfigReason> initConditions(
@@ -2012,6 +2040,7 @@ optional<InvalidConfigReason> initStatsdConfig(
     vector<ConditionState> initialConditionCache;
     unordered_map<int64_t, int> stateAtomIdMap;
     unordered_map<int64_t, unordered_map<int, int64_t>> allStateGroupMaps;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
 
     if (config.package_certificate_hash_size_bytes() > UINT8_MAX) {
         ALOGE("Invalid value for package_certificate_hash_size_bytes: %d",
@@ -2019,15 +2048,16 @@ optional<InvalidConfigReason> initStatsdConfig(
         return InvalidConfigReason(INVALID_CONFIG_REASON_PACKAGE_CERT_HASH_SIZE_TOO_LARGE);
     }
 
-    optional<InvalidConfigReason> invalidConfigReason =
-            initAtomMatchingTrackers(config, uidMap, atomMatchingTrackerMap,
-                                     allAtomMatchingTrackers, allTagIdsToMatchersMap);
-    if (invalidConfigReason.has_value()) {
-        ALOGE("initAtomMatchingTrackers failed");
-        return invalidConfigReason;
+    bool allMatchersValid = initAtomMatchingTrackers(config, uidMap, atomMatchingTrackerMap,
+                                                     allAtomMatchingTrackers,
+                                                     allTagIdsToMatchersMap, invalidEntities);
+    if (!allMatchersValid) {
+        ALOGE("initAtomMatchingTrackers has invalid matchers");
+        return invalidEntities.begin()->second;
     }
     VLOG("initAtomMatchingTrackers succeed...");
 
+    optional<InvalidConfigReason> invalidConfigReason;
     invalidConfigReason =
             initConditions(key, config, atomMatchingTrackerMap, conditionTrackerMap,
                            allConditionTrackers, trackerToConditionMap, initialConditionCache);
