@@ -43,6 +43,7 @@ android_test_helper_app {
         "android.test.runner.stubs.system",
         "junit",
         "org.apache.http.legacy.stubs.system",
+        "statsd_flags_java_lib",
     ],
     privileged: true,
     static_libs: [

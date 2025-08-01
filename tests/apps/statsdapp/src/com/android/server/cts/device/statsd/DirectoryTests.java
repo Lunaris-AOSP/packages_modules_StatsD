@@ -23,6 +23,10 @@ import java.io.File;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import android.platform.test.annotations.RequiresFlagsEnabled;
+
+import com.android.os.statsd.flags.Flags;
+
 public class DirectoryTests {
 
     @Test
@@ -56,6 +60,14 @@ public class DirectoryTests {
     @Test
     public void testTrainInfoDirectoryExists() {
         final File f = new File("/data/misc/train-info/");
+        assertTrue(f.exists());
+        assertFalse(f.isFile());
+    }
+
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_LOGGING_CONTROL_ENABLED)
+    public void testStatsAtomsInUseDirectoryExists() {
+        final File f = new File("/data/misc/stats-atoms/");
         assertTrue(f.exists());
         assertFalse(f.isFile());
     }
