@@ -413,6 +413,7 @@ cc_test {
 
     srcs: [
         "tests/AlarmMonitor_test.cpp",
+        "tests/AtomIdSetManager_test.cpp",
         "tests/anomaly/AlarmTracker_test.cpp",
         "tests/anomaly/AnomalyTracker_test.cpp",
         "tests/condition/CombinationConditionTracker_test.cpp",

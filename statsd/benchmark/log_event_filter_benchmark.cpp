@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 #include <random>
+#include <set>
+#include <unordered_set>
 #include <vector>
 
 #include "benchmark/benchmark.h"
-#include "socket/LogEventFilter.h"
+#include "socket/LogEventFilterUtils.h"
 
 namespace android {
 namespace os {
@@ -28,15 +30,17 @@ namespace {
 constexpr int kAtomIdsCount = 500;         //  Filter size setup
 constexpr int kAtomIdsSampleCount = 3000;  //  Queries number
 
-std::vector<int> generateSampleAtomIdsList() {
-    std::vector<int> atomIds(kAtomIdsSampleCount);
+using AtomIdType = int32_t;
+
+std::vector<AtomIdType> generateSampleAtomIdsList() {
+    std::vector<AtomIdType> atomIds(kAtomIdsSampleCount);
 
     std::default_random_engine generator;
 
     // Get atoms ids which are not in the filter to test behavior when set is searched for an
     // an absent key
     // Expected atoms ids are in a range 1..3000, random & evenly distributes
-    std::uniform_int_distribution<int> distribution(1, kAtomIdsSampleCount);
+    std::uniform_int_distribution<AtomIdType> distribution(1, kAtomIdsSampleCount);
 
     for (int i = 0; i < kAtomIdsSampleCount; ++i) {
         atomIds[i] = distribution(generator);
@@ -50,7 +54,7 @@ T generateAtomIds() {
     T atomIds;
 
     std::default_random_engine generator;
-    std::uniform_int_distribution<int> distribution(1, kAtomIdsCount);
+    std::uniform_int_distribution<AtomIdType> distribution(1, kAtomIdsCount);
 
     for (int i = 0; i < kAtomIdsCount; ++i) {
         atomIds.insert(distribution(generator));
@@ -60,31 +64,37 @@ T generateAtomIds() {
 }
 
 // Used to setup filter
-const std::set<int> kAtomIdsSet = generateAtomIds<std::set<int>>();
-const std::unordered_set<int> kAtomIdsUnorderedSet = generateAtomIds<std::unordered_set<int>>();
+const std::set<AtomIdType> kAtomIdsSet = generateAtomIds<std::set<AtomIdType>>();
+const std::unordered_set<AtomIdType> kAtomIdsUnorderedSet =
+        generateAtomIds<std::unordered_set<AtomIdType>>();
 
-const std::set<int> kAtomIdsSet2 = generateAtomIds<std::set<int>>();
-const std::unordered_set<int> kAtomIdsUnorderedSet2 = generateAtomIds<std::unordered_set<int>>();
+const std::set<AtomIdType> kAtomIdsSet2 = generateAtomIds<std::set<AtomIdType>>();
+const std::unordered_set<AtomIdType> kAtomIdsUnorderedSet2 =
+        generateAtomIds<std::unordered_set<AtomIdType>>();
 
-const std::set<int> kAtomIdsSet3 = generateAtomIds<std::set<int>>();
-const std::unordered_set<int> kAtomIdsUnorderedSet3 = generateAtomIds<std::unordered_set<int>>();
+const std::set<AtomIdType> kAtomIdsSet3 = generateAtomIds<std::set<AtomIdType>>();
+const std::unordered_set<AtomIdType> kAtomIdsUnorderedSet3 =
+        generateAtomIds<std::unordered_set<AtomIdType>>();
 
-const std::set<int> kAtomIdsSet4 = generateAtomIds<std::set<int>>();
-const std::unordered_set<int> kAtomIdsUnorderedSet4 = generateAtomIds<std::unordered_set<int>>();
+const std::set<AtomIdType> kAtomIdsSet4 = generateAtomIds<std::set<AtomIdType>>();
+const std::unordered_set<AtomIdType> kAtomIdsUnorderedSet4 =
+        generateAtomIds<std::unordered_set<AtomIdType>>();
 
 // Used to perform sample quieries
-const std::vector<int> kSampleIdsList = generateSampleAtomIdsList();
+const std::vector<AtomIdType> kSampleIdsList = generateSampleAtomIdsList();
 
 }  // namespace
 
 static void BM_LogEventFilterUnorderedSet(benchmark::State& state) {
     while (state.KeepRunning()) {
-        LogEventFilter eventFilter;
+        using AtomIdSetManager = AtomIdSetManagerBase<std::unordered_set<AtomIdType>>;
+        AtomIdSetManager setMgr;
+
         // populate
-        eventFilter.setAtomIds(kAtomIdsUnorderedSet, nullptr);
+        setMgr.setAtomIds(kAtomIdsUnorderedSet, nullptr);
         // many fetches
         for (const auto& atomId : kSampleIdsList) {
-            benchmark::DoNotOptimize(eventFilter.isAtomInUse(atomId));
+            benchmark::DoNotOptimize(isAtomInSet(setMgr.getAtomIds(), atomId));
         }
     }
 }
@@ -92,15 +102,17 @@ BENCHMARK(BM_LogEventFilterUnorderedSet);
 
 static void BM_LogEventFilterUnorderedSet2Consumers(benchmark::State& state) {
     while (state.KeepRunning()) {
-        LogEventFilter eventFilter;
+        using AtomIdSetManager = AtomIdSetManagerBase<std::unordered_set<AtomIdType>>;
+        AtomIdSetManager setMgr;
+
         // populate
-        eventFilter.setAtomIds(kAtomIdsUnorderedSet, &kAtomIdsUnorderedSet);
-        eventFilter.setAtomIds(kAtomIdsUnorderedSet2, &kAtomIdsUnorderedSet2);
-        eventFilter.setAtomIds(kAtomIdsUnorderedSet3, &kAtomIdsUnorderedSet);
-        eventFilter.setAtomIds(kAtomIdsUnorderedSet4, &kAtomIdsUnorderedSet2);
+        setMgr.setAtomIds(kAtomIdsUnorderedSet, &kAtomIdsUnorderedSet);
+        setMgr.setAtomIds(kAtomIdsUnorderedSet2, &kAtomIdsUnorderedSet2);
+        setMgr.setAtomIds(kAtomIdsUnorderedSet3, &kAtomIdsUnorderedSet);
+        setMgr.setAtomIds(kAtomIdsUnorderedSet4, &kAtomIdsUnorderedSet2);
         // many fetches
         for (const auto& atomId : kSampleIdsList) {
-            benchmark::DoNotOptimize(eventFilter.isAtomInUse(atomId));
+            benchmark::DoNotOptimize(isAtomInSet(setMgr.getAtomIds(), atomId));
         }
     }
 }
@@ -108,12 +120,14 @@ BENCHMARK(BM_LogEventFilterUnorderedSet2Consumers);
 
 static void BM_LogEventFilterSet(benchmark::State& state) {
     while (state.KeepRunning()) {
-        LogEventFilterGeneric<std::set<int32_t>> eventFilter;
+        using AtomIdSetManager = AtomIdSetManagerBase<std::set<AtomIdType>>;
+        AtomIdSetManager setMgr;
+
         // populate
-        eventFilter.setAtomIds(kAtomIdsSet, nullptr);
+        setMgr.setAtomIds(kAtomIdsSet, nullptr);
         // many fetches
         for (const auto& atomId : kSampleIdsList) {
-            benchmark::DoNotOptimize(eventFilter.isAtomInUse(atomId));
+            benchmark::DoNotOptimize(isAtomInSet(setMgr.getAtomIds(), atomId));
         }
     }
 }
@@ -121,15 +135,17 @@ BENCHMARK(BM_LogEventFilterSet);
 
 static void BM_LogEventFilterSet2Consumers(benchmark::State& state) {
     while (state.KeepRunning()) {
-        LogEventFilterGeneric<std::set<int32_t>> eventFilter;
+        using AtomIdSetManager = AtomIdSetManagerBase<std::set<AtomIdType>>;
+        AtomIdSetManager setMgr;
+
         // populate
-        eventFilter.setAtomIds(kAtomIdsSet, &kAtomIdsSet);
-        eventFilter.setAtomIds(kAtomIdsSet2, &kAtomIdsSet2);
-        eventFilter.setAtomIds(kAtomIdsSet3, &kAtomIdsSet);
-        eventFilter.setAtomIds(kAtomIdsSet4, &kAtomIdsSet2);
+        setMgr.setAtomIds(kAtomIdsSet, &kAtomIdsSet);
+        setMgr.setAtomIds(kAtomIdsSet2, &kAtomIdsSet2);
+        setMgr.setAtomIds(kAtomIdsSet3, &kAtomIdsSet);
+        setMgr.setAtomIds(kAtomIdsSet4, &kAtomIdsSet2);
         // many fetches
         for (const auto& atomId : kSampleIdsList) {
-            benchmark::DoNotOptimize(eventFilter.isAtomInUse(atomId));
+            benchmark::DoNotOptimize(isAtomInSet(setMgr.getAtomIds(), atomId));
         }
     }
 }
