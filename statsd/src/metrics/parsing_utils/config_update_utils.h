@@ -81,10 +81,10 @@ bool updateAtomMatchingTrackers(
 // Recursive function to determine if a condition needs to be updated.
 // input:
 // [config]: the input StatsdConfig
-// [conditionIdx]: the index of the current condition to be updated
+// [predicate]: the predicate to be updated
 // [oldConditionTrackerMap]: condition id to index mapping in the existing MetricsManager
 // [oldConditionTrackers]: stores the existing ConditionTrackers
-// [newConditionTrackerMap]: condition id to index mapping in the input StatsdConfig
+// [allConditionsMap]: condition id to predicate mapping in the input StatsdConfig
 // [replacedMatchers]: set of replaced matcher ids. conditions using these matchers must be replaced
 // output:
 // [conditionsToUpdate]: vector of the update status of each condition. The conditionIdx index will
@@ -92,12 +92,13 @@ bool updateAtomMatchingTrackers(
 // [cycleTracker]: intermediate param used during recursion.
 // Returns nullopt if successful and InvalidConfigReason if not.
 std::optional<InvalidConfigReason> determineConditionUpdateStatus(
-        const StatsdConfig& config, int conditionIdx,
+        const StatsdConfig& config, const Predicate& predicate,
         const std::unordered_map<int64_t, int>& oldConditionTrackerMap,
         const std::vector<sp<ConditionTracker>>& oldConditionTrackers,
-        const std::unordered_map<int64_t, int>& newConditionTrackerMap,
-        const std::set<int64_t>& replacedMatchers, std::vector<UpdateStatus>& conditionsToUpdate,
-        std::vector<uint8_t>& cycleTracker);
+        const std::unordered_map<int64_t, ConditionProtoAndTracker>& allConditionsMap,
+        const std::set<int64_t>& replacedMatchers,
+        std::unordered_map<int64_t, UpdateStatus>& conditionsToUpdate,
+        std::unordered_set<int64_t>& cycleTracker);
 
 // Updates ConditionTrackers
 // input:
@@ -113,17 +114,19 @@ std::optional<InvalidConfigReason> determineConditionUpdateStatus(
 //                          to indices of condition trackers that use the matcher
 // [conditionCache]: stores the current conditions for each ConditionTracker
 // [replacedConditions]: set of condition ids that have changed and have been replaced
-// Returns nullopt if successful and InvalidConfigReason if not.
-std::optional<InvalidConfigReason> updateConditions(
-        const ConfigKey& key, const StatsdConfig& config,
-        const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
-        const std::set<int64_t>& replacedMatchers,
-        const std::unordered_map<int64_t, int>& oldConditionTrackerMap,
-        const std::vector<sp<ConditionTracker>>& oldConditionTrackers,
-        std::unordered_map<int64_t, int>& newConditionTrackerMap,
-        std::vector<sp<ConditionTracker>>& newConditionTrackers,
-        std::unordered_map<int, std::vector<int>>& trackerToConditionMap,
-        std::vector<ConditionState>& conditionCache, std::set<int64_t>& replacedConditions);
+// [invalidEntities]: a map of entity id to the reason why the entity is invalid
+// Returns whether all conditions were valid.
+bool updateConditions(const ConfigKey& key, const StatsdConfig& config,
+                      const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
+                      const std::set<int64_t>& replacedMatchers,
+                      const std::unordered_map<int64_t, int>& oldConditionTrackerMap,
+                      const std::vector<sp<ConditionTracker>>& oldConditionTrackers,
+                      std::unordered_map<int64_t, int>& newConditionTrackerMap,
+                      std::vector<sp<ConditionTracker>>& newConditionTrackers,
+                      std::unordered_map<int, std::vector<int>>& trackerToConditionMap,
+                      std::vector<ConditionState>& conditionCache,
+                      std::set<int64_t>& replacedConditions,
+                      std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 std::optional<InvalidConfigReason> updateStates(
         const StatsdConfig& config, const std::map<int64_t, uint64_t>& oldStateProtoHashes,

@@ -278,23 +278,23 @@ bool updateAtomMatchingTrackers(
 // Recursive function to determine if a condition needs to be updated. Populates
 // conditionUpdateStatus. Returns nullopt if successful and InvalidConfigReason if not.
 optional<InvalidConfigReason> determineConditionUpdateStatus(
-        const StatsdConfig& config, const int conditionIdx,
+        const StatsdConfig& config, const Predicate& predicate,
         const unordered_map<int64_t, int>& oldConditionTrackerMap,
         const vector<sp<ConditionTracker>>& oldConditionTrackers,
-        const unordered_map<int64_t, int>& newConditionTrackerMap,
-        const set<int64_t>& replacedMatchers, vector<UpdateStatus>& conditionUpdateStatus,
-        vector<uint8_t>& cycleTracker) {
+        const unordered_map<int64_t, ConditionProtoAndTracker>& allConditionsMap,
+        const set<int64_t>& replacedMatchers,
+        unordered_map<int64_t, UpdateStatus>& conditionUpdateStatus,
+        unordered_set<int64_t>& cycleTracker) {
+    int64_t id = predicate.id();
     // Have already examined this condition.
-    if (conditionUpdateStatus[conditionIdx] != UPDATE_UNKNOWN) {
+    if (conditionUpdateStatus.contains(id)) {
         return nullopt;
     }
 
-    const Predicate& predicate = config.predicate(conditionIdx);
-    int64_t id = predicate.id();
     // Check if new condition.
     const auto& oldConditionTrackerIt = oldConditionTrackerMap.find(id);
     if (oldConditionTrackerIt == oldConditionTrackerMap.end()) {
-        conditionUpdateStatus[conditionIdx] = UPDATE_NEW;
+        conditionUpdateStatus[id] = UPDATE_NEW;
         return nullopt;
     }
 
@@ -307,7 +307,7 @@ optional<InvalidConfigReason> determineConditionUpdateStatus(
     }
     uint64_t newProtoHash = Hash64(serializedCondition);
     if (newProtoHash != oldConditionTrackers[oldConditionTrackerIt->second]->getProtoHash()) {
-        conditionUpdateStatus[conditionIdx] = UPDATE_REPLACE;
+        conditionUpdateStatus[id] = UPDATE_REPLACE;
         return nullopt;
     }
 
@@ -318,40 +318,40 @@ optional<InvalidConfigReason> determineConditionUpdateStatus(
             const SimplePredicate& simplePredicate = predicate.simple_predicate();
             if (simplePredicate.has_start()) {
                 if (replacedMatchers.find(simplePredicate.start()) != replacedMatchers.end()) {
-                    conditionUpdateStatus[conditionIdx] = UPDATE_REPLACE;
+                    conditionUpdateStatus[id] = UPDATE_REPLACE;
                     return nullopt;
                 }
             }
             if (simplePredicate.has_stop()) {
                 if (replacedMatchers.find(simplePredicate.stop()) != replacedMatchers.end()) {
-                    conditionUpdateStatus[conditionIdx] = UPDATE_REPLACE;
+                    conditionUpdateStatus[id] = UPDATE_REPLACE;
                     return nullopt;
                 }
             }
             if (simplePredicate.has_stop_all()) {
                 if (replacedMatchers.find(simplePredicate.stop_all()) != replacedMatchers.end()) {
-                    conditionUpdateStatus[conditionIdx] = UPDATE_REPLACE;
+                    conditionUpdateStatus[id] = UPDATE_REPLACE;
                     return nullopt;
                 }
             }
-            conditionUpdateStatus[conditionIdx] = UPDATE_PRESERVE;
+            conditionUpdateStatus[id] = UPDATE_PRESERVE;
             return nullopt;
         }
         case Predicate::ContentsCase::kCombination: {
             // Need to recurse on the children to see if any of the child predicates changed.
-            cycleTracker[conditionIdx] = true;
+            cycleTracker.insert(id);
             UpdateStatus status = UPDATE_PRESERVE;
             for (const int64_t childPredicateId : predicate.combination().predicate()) {
-                const auto& childIt = newConditionTrackerMap.find(childPredicateId);
-                if (childIt == newConditionTrackerMap.end()) {
+                const auto& childIt = allConditionsMap.find(childPredicateId);
+                if (childIt == allConditionsMap.end()) {
                     ALOGW("Predicate %lld not found in the config", (long long)childPredicateId);
                     invalidConfigReason = createInvalidConfigReasonWithPredicate(
                             INVALID_CONFIG_REASON_CONDITION_CHILD_NOT_FOUND, id);
                     invalidConfigReason->conditionIds.push_back(childPredicateId);
                     return invalidConfigReason;
                 }
-                const int childIdx = childIt->second;
-                if (cycleTracker[childIdx]) {
+                const int64_t childId = childIt->first;
+                if (cycleTracker.contains(childId)) {
                     ALOGE("Cycle detected in predicate config");
                     invalidConfigReason = createInvalidConfigReasonWithPredicate(
                             INVALID_CONFIG_REASON_CONDITION_CYCLE, id);
@@ -359,21 +359,21 @@ optional<InvalidConfigReason> determineConditionUpdateStatus(
                     return invalidConfigReason;
                 }
                 invalidConfigReason = determineConditionUpdateStatus(
-                        config, childIdx, oldConditionTrackerMap, oldConditionTrackers,
-                        newConditionTrackerMap, replacedMatchers, conditionUpdateStatus,
-                        cycleTracker);
+                        config, childIt->second.predicate, oldConditionTrackerMap,
+                        oldConditionTrackers, allConditionsMap, replacedMatchers,
+                        conditionUpdateStatus, cycleTracker);
                 if (invalidConfigReason.has_value()) {
                     invalidConfigReason->conditionIds.push_back(id);
                     return invalidConfigReason;
                 }
 
-                if (conditionUpdateStatus[childIdx] == UPDATE_REPLACE) {
+                if (conditionUpdateStatus[childId] == UPDATE_REPLACE) {
                     status = UPDATE_REPLACE;
                     break;
                 }
             }
-            conditionUpdateStatus[conditionIdx] = status;
-            cycleTracker[conditionIdx] = false;
+            conditionUpdateStatus[id] = status;
+            cycleTracker.erase(id);
             return nullopt;
         }
         default: {
@@ -386,63 +386,65 @@ optional<InvalidConfigReason> determineConditionUpdateStatus(
     return nullopt;
 }
 
-optional<InvalidConfigReason> updateConditions(
-        const ConfigKey& key, const StatsdConfig& config,
-        const unordered_map<int64_t, int>& atomMatchingTrackerMap,
-        const set<int64_t>& replacedMatchers,
-        const unordered_map<int64_t, int>& oldConditionTrackerMap,
-        const vector<sp<ConditionTracker>>& oldConditionTrackers,
-        unordered_map<int64_t, int>& newConditionTrackerMap,
-        vector<sp<ConditionTracker>>& newConditionTrackers,
-        unordered_map<int, vector<int>>& trackerToConditionMap,
-        vector<ConditionState>& conditionCache, set<int64_t>& replacedConditions) {
-    vector<Predicate> conditionProtos;
-    const int conditionTrackerCount = config.predicate_size();
-    conditionProtos.reserve(conditionTrackerCount);
-    newConditionTrackers.reserve(conditionTrackerCount);
-    conditionCache.assign(conditionTrackerCount, ConditionState::kNotEvaluated);
+bool updateConditions(const ConfigKey& key, const StatsdConfig& config,
+                      const unordered_map<int64_t, int>& atomMatchingTrackerMap,
+                      const set<int64_t>& replacedMatchers,
+                      const unordered_map<int64_t, int>& oldConditionTrackerMap,
+                      const vector<sp<ConditionTracker>>& oldConditionTrackers,
+                      unordered_map<int64_t, int>& newConditionTrackerMap,
+                      vector<sp<ConditionTracker>>& newConditionTrackers,
+                      unordered_map<int, vector<int>>& trackerToConditionMap,
+                      vector<ConditionState>& conditionCache, set<int64_t>& replacedConditions,
+                      unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities) {
+    bool allConditionsValid = true;
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
     optional<InvalidConfigReason> invalidConfigReason;
 
-    for (int i = 0; i < conditionTrackerCount; i++) {
+    for (int i = 0; i < config.predicate_size(); i++) {
         const Predicate& condition = config.predicate(i);
-        if (newConditionTrackerMap.find(condition.id()) != newConditionTrackerMap.end()) {
+        if (allConditionsMap.find(condition.id()) != allConditionsMap.end()) {
             ALOGE("Duplicate Predicate found!");
-            return createInvalidConfigReasonWithPredicate(INVALID_CONFIG_REASON_CONDITION_DUPLICATE,
-                                                          condition.id());
+            allConditionsValid = false;
+            invalidEntities[{condition.id(), INVALID_ENTITY_TYPE_PREDICATE}] =
+                    createInvalidConfigReasonWithPredicate(
+                            INVALID_CONFIG_REASON_CONDITION_DUPLICATE, condition.id());
         }
-        newConditionTrackerMap[condition.id()] = i;
-        conditionProtos.push_back(condition);
+        allConditionsMap[condition.id()] = {condition, nullptr};
     }
 
-    vector<UpdateStatus> conditionUpdateStatus(conditionTrackerCount, UPDATE_UNKNOWN);
-    vector<uint8_t> cycleTracker(conditionTrackerCount, false);
-    for (int i = 0; i < conditionTrackerCount; i++) {
+    unordered_map<int64_t, UpdateStatus> conditionUpdateStatus;
+    unordered_set<int64_t> cycleTracker;
+    for (const auto& [id, conditionValue] : allConditionsMap) {
+        cycleTracker.clear();
         invalidConfigReason = determineConditionUpdateStatus(
-                config, i, oldConditionTrackerMap, oldConditionTrackers, newConditionTrackerMap,
-                replacedMatchers, conditionUpdateStatus, cycleTracker);
+                config, conditionValue.predicate, oldConditionTrackerMap, oldConditionTrackers,
+                allConditionsMap, replacedMatchers, conditionUpdateStatus, cycleTracker);
         if (invalidConfigReason.has_value()) {
-            return invalidConfigReason;
+            allConditionsValid = false;
+            invalidEntities[{id, INVALID_ENTITY_TYPE_PREDICATE}] = invalidConfigReason.value();
         }
     }
 
     // Update status has been determined for all conditions. Now perform the update.
-    set<int> preservedConditions;
-    for (int i = 0; i < conditionTrackerCount; i++) {
-        const Predicate& predicate = config.predicate(i);
-        const int64_t id = predicate.id();
-        switch (conditionUpdateStatus[i]) {
+    unordered_set<int64_t> preservedConditions;
+    for (auto& [id, conditionValue] : allConditionsMap) {
+        const Predicate& predicate = conditionValue.predicate;
+        switch (conditionUpdateStatus[id]) {
             case UPDATE_PRESERVE: {
-                preservedConditions.insert(i);
+                preservedConditions.insert(id);
                 const auto& oldConditionTrackerIt = oldConditionTrackerMap.find(id);
                 if (oldConditionTrackerIt == oldConditionTrackerMap.end()) {
                     ALOGE("Could not find Predicate %lld in the previous config, but expected it "
                           "to be there",
                           (long long)id);
-                    return createInvalidConfigReasonWithPredicate(
-                            INVALID_CONFIG_REASON_CONDITION_NOT_IN_PREV_CONFIG, id);
+                    allConditionsValid = false;
+                    invalidEntities[{id, INVALID_ENTITY_TYPE_PREDICATE}] =
+                            createInvalidConfigReasonWithPredicate(
+                                    INVALID_CONFIG_REASON_CONDITION_NOT_IN_PREV_CONFIG, id);
                 }
-                const int oldIndex = oldConditionTrackerIt->second;
-                newConditionTrackers.push_back(oldConditionTrackers[oldIndex]);
+                const sp<ConditionTracker>& tracker =
+                        oldConditionTrackers[oldConditionTrackerIt->second];
+                conditionValue.conditionTracker = tracker;
                 break;
             }
             case UPDATE_REPLACE:
@@ -450,50 +452,91 @@ optional<InvalidConfigReason> updateConditions(
                 [[fallthrough]];  // Intentionally fallthrough to create the new condition tracker.
             case UPDATE_NEW: {
                 sp<ConditionTracker> tracker = createConditionTracker(
-                        key, predicate, i, atomMatchingTrackerMap, invalidConfigReason);
+                        key, predicate, invalidEntities, invalidConfigReason);
                 if (tracker == nullptr) {
-                    return invalidConfigReason;
+                    allConditionsValid = false;
+                    if (invalidConfigReason.has_value()) {
+                        invalidEntities[{id, INVALID_ENTITY_TYPE_PREDICATE}] =
+                                invalidConfigReason.value();
+                    } else {
+                        // Should never happen
+                        invalidEntities[{id, INVALID_ENTITY_TYPE_PREDICATE}] =
+                                createInvalidConfigReasonWithPredicate(
+                                        INVALID_CONFIG_REASON_UNKNOWN, id);
+                    }
                 }
-                newConditionTrackers.push_back(tracker);
+                conditionValue.conditionTracker = tracker;
                 break;
             }
             default: {
+                if (invalidEntities.contains({id, INVALID_ENTITY_TYPE_PREDICATE})) {
+                    // Invalid conditions may not have an update state set.
+                    break;
+                }
                 ALOGE("Condition \"%lld\" update state is unknown. This should never happen",
                       (long long)id);
-                return createInvalidConfigReasonWithPredicate(
-                        INVALID_CONFIG_REASON_CONDITION_UPDATE_STATUS_UNKNOWN, id);
+                allConditionsValid = false;
+                invalidEntities[{id, INVALID_ENTITY_TYPE_PREDICATE}] =
+                        createInvalidConfigReasonWithPredicate(
+                                INVALID_CONFIG_REASON_CONDITION_UPDATE_STATUS_UNKNOWN, id);
             }
         }
     }
 
-    // Update indices of preserved predicates.
-    for (const int conditionIndex : preservedConditions) {
-        invalidConfigReason = newConditionTrackers[conditionIndex]->onConfigUpdated(
-                conditionProtos, conditionIndex, newConditionTrackers, atomMatchingTrackerMap,
-                newConditionTrackerMap);
-        if (invalidConfigReason.has_value()) {
-            ALOGE("Failed to update condition %lld",
-                  (long long)newConditionTrackers[conditionIndex]->getConditionId());
-            return invalidConfigReason;
+    for (const auto& [id, conditionValue] : allConditionsMap) {
+        if (conditionValue.conditionTracker == nullptr) {
+            continue;
+        }
+        cycleTracker.clear();
+        const auto& invalidReason =
+                conditionValue.conditionTracker->isTrackerValid(allConditionsMap, cycleTracker);
+        if (invalidReason.has_value()) {
+            allConditionsValid = false;
+            invalidEntities[{id, INVALID_ENTITY_TYPE_PREDICATE}] = invalidReason.value();
         }
     }
 
-    std::fill(cycleTracker.begin(), cycleTracker.end(), false);
-    for (int conditionIndex = 0; conditionIndex < conditionTrackerCount; conditionIndex++) {
-        const sp<ConditionTracker>& conditionTracker = newConditionTrackers[conditionIndex];
-        // Calling init on preserved conditions is OK. It is needed to fill the condition cache.
-        invalidConfigReason =
-                conditionTracker->init(conditionProtos, newConditionTrackers,
-                                       newConditionTrackerMap, cycleTracker, conditionCache);
-        if (invalidConfigReason.has_value()) {
-            return invalidConfigReason;
+    // Reserve the maximum amount since invalid entities are rare
+    newConditionTrackers.reserve(config.predicate_size());
+    conditionCache.reserve(config.predicate_size());
+    int outIndex = 0;
+    for (const auto& predicate : config.predicate()) {
+        if (!invalidEntities.contains({predicate.id(), INVALID_ENTITY_TYPE_PREDICATE})) {
+            newConditionTrackerMap[predicate.id()] = outIndex;
+            newConditionTrackers.push_back(allConditionsMap.at(predicate.id()).conditionTracker);
+            conditionCache.push_back(ConditionState::kNotEvaluated);
+            ++outIndex;
         }
+    }
+
+    unordered_set<int64_t> initializedConditions;
+    for (const int64_t conditionId : preservedConditions) {
+        if (!invalidEntities.contains({conditionId, INVALID_ENTITY_TYPE_PREDICATE})) {
+            const auto& conditionValue = allConditionsMap.find(conditionId)->second;
+            const int conditionIndex = newConditionTrackerMap[conditionId];
+            conditionValue.conditionTracker->onConfigUpdated(
+                    allConditionsMap, conditionIndex, newConditionTrackers, atomMatchingTrackerMap,
+                    newConditionTrackerMap);
+            // Preserved conditions are added to this set to avoid reinitializing them in the
+            // subsequent loop.
+            initializedConditions.insert(conditionId);
+        }
+    }
+
+    for (size_t conditionIndex = 0; conditionIndex < newConditionTrackers.size();
+         ++conditionIndex) {
+        // Calling init on preserved conditions is OK. It is needed to fill the condition cache.
+        auto& conditionTracker = newConditionTrackers[conditionIndex];
+        conditionTracker->init(conditionIndex, allConditionsMap, newConditionTrackers,
+                               newConditionTrackerMap, atomMatchingTrackerMap,
+                               initializedConditions, conditionCache);
         for (const int trackerIndex : conditionTracker->getAtomMatchingTrackerIndex()) {
             vector<int>& conditionList = trackerToConditionMap[trackerIndex];
             conditionList.push_back(conditionIndex);
         }
     }
-    return nullopt;
+
+    return allConditionsValid;
 }
 
 optional<InvalidConfigReason> updateStates(
@@ -1297,13 +1340,13 @@ optional<InvalidConfigReason> updateStatsdConfig(
         return invalidEntities.begin()->second;
     }
 
-    invalidConfigReason = updateConditions(
+    bool allConditionsValid = updateConditions(
             key, config, newAtomMatchingTrackerMap, replacedMatchers, oldConditionTrackerMap,
             oldConditionTrackers, newConditionTrackerMap, newConditionTrackers,
-            trackerToConditionMap, conditionCache, replacedConditions);
-    if (invalidConfigReason.has_value()) {
+            trackerToConditionMap, conditionCache, replacedConditions, invalidEntities);
+    if (!allConditionsValid) {
         ALOGE("updateConditions failed");
-        return invalidConfigReason;
+        return invalidEntities.begin()->second;
     }
 
     invalidConfigReason = updateStates(config, oldStateProtoHashes, stateAtomIdMap,

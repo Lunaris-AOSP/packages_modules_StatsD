@@ -46,6 +46,7 @@ using std::nullopt;
 using std::optional;
 using std::set;
 using std::unordered_map;
+using std::unordered_set;
 using std::vector;
 
 #ifdef __ANDROID__
@@ -428,7 +429,6 @@ TEST_F(MetricsManagerUtilTest, TestCirclePredicateDependency) {
     optional<InvalidConfigReason> expectedInvalidConfigReason =
             createInvalidConfigReasonWithPredicate(INVALID_CONFIG_REASON_CONDITION_CYCLE,
                                                    StringToId("SCREEN_IS_EITHER_ON_OFF"));
-    expectedInvalidConfigReason->conditionIds.push_back(StringToId("SCREEN_IS_EITHER_ON_OFF"));
 
     EXPECT_EQ(initConfig(buildCirclePredicates()), expectedInvalidConfigReason);
 }
@@ -1417,9 +1417,9 @@ TEST_F(MetricsManagerUtilTest, TestCreateConditionTrackerInvalid) {
     // Predicate has no contents_case (simple/combination), so it is invalid.
     Predicate predicate;
     predicate.set_id(21);
-    unordered_map<int64_t, int> atomTrackerMap;
     optional<InvalidConfigReason> invalidConfigReason;
-    EXPECT_EQ(createConditionTracker(key, predicate, 0, atomTrackerMap, invalidConfigReason),
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_EQ(createConditionTracker(key, predicate, invalidEntities, invalidConfigReason),
               nullptr);
     EXPECT_EQ(invalidConfigReason,
               createInvalidConfigReasonWithPredicate(
@@ -1427,7 +1427,6 @@ TEST_F(MetricsManagerUtilTest, TestCreateConditionTrackerInvalid) {
 }
 
 TEST_F(MetricsManagerUtilTest, TestCreateConditionTrackerSimple) {
-    int index = 1;
     int64_t id = 987;
     const ConfigKey key(123, 456);
 
@@ -1446,9 +1445,23 @@ TEST_F(MetricsManagerUtilTest, TestCreateConditionTrackerSimple) {
     atomTrackerMap[stopMatcherId] = stopMatcherIndex;
     atomTrackerMap[stopAllMatcherId] = stopAllMatcherIndex;
 
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
     optional<InvalidConfigReason> invalidConfigReason;
     sp<ConditionTracker> tracker =
-            createConditionTracker(key, predicate, index, atomTrackerMap, invalidConfigReason);
+            createConditionTracker(key, predicate, invalidEntities, invalidConfigReason);
+
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
+    allConditionsMap[predicate.id()] = {predicate, tracker};
+
+    vector<sp<ConditionTracker>> allConditionTrackers = {tracker};
+
+    unordered_map<int64_t, int> conditionIdIndexMap;
+    conditionIdIndexMap[predicate.id()] = 0;
+    unordered_set<int64_t> initializedConditions;
+    vector<ConditionState> conditionCache = {kNotEvaluated};
+
+    tracker->init(/*index=*/0, allConditionsMap, allConditionTrackers, conditionIdIndexMap,
+                  atomTrackerMap, initializedConditions, conditionCache);
     EXPECT_EQ(invalidConfigReason, nullopt);
     EXPECT_EQ(tracker->getConditionId(), id);
     EXPECT_EQ(tracker->isSliced(), false);
@@ -1461,7 +1474,6 @@ TEST_F(MetricsManagerUtilTest, TestCreateConditionTrackerSimple) {
 }
 
 TEST_F(MetricsManagerUtilTest, TestCreateConditionTrackerCombination) {
-    int index = 1;
     int64_t id = 987;
     const ConfigKey key(123, 456);
 
@@ -1473,10 +1485,10 @@ TEST_F(MetricsManagerUtilTest, TestCreateConditionTrackerCombination) {
     combinationPredicate->add_predicate(777);
 
     // Combination conditions must be initialized to set most state.
-    unordered_map<int64_t, int> atomTrackerMap;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
     optional<InvalidConfigReason> invalidConfigReason;
     sp<ConditionTracker> tracker =
-            createConditionTracker(key, predicate, index, atomTrackerMap, invalidConfigReason);
+            createConditionTracker(key, predicate, invalidEntities, invalidConfigReason);
     EXPECT_EQ(invalidConfigReason, nullopt);
     EXPECT_EQ(tracker->getConditionId(), id);
     EXPECT_FALSE(tracker->IsSimpleCondition());
@@ -2831,6 +2843,172 @@ TEST_F(MetricsManagerUtilTest, TestInitMatchersNoCycle) {
                                     newAtomMatchingTrackers, {matcher2.id(), matcher4.id()})));
     EXPECT_THAT(tagIds[12], UnorderedElementsAreArray(filterMatcherIndexesById(
                                     newAtomMatchingTrackers, {matcher3.id(), matcher5.id()})));
+}
+
+TEST_F(MetricsManagerUtilTest, TestInitConditionsNoCycle) {
+    StatsdConfig config;
+
+    AtomMatcher matcher1 = CreateScreenTurnedOnAtomMatcher();
+    int64_t matcher1Id = matcher1.id();
+    *config.add_atom_matcher() = matcher1;
+
+    AtomMatcher matcher2 = CreateScreenTurnedOffAtomMatcher();
+    int64_t matcher2Id = matcher2.id();
+    *config.add_atom_matcher() = matcher2;
+
+    AtomMatcher matcher3 = CreateBatterySaverModeStartAtomMatcher();
+    int64_t matcher4Id = matcher3.id();
+    *config.add_atom_matcher() = matcher3;
+
+    AtomMatcher matcher4 = CreateBatterySaverModeStopAtomMatcher();
+    int64_t matcher3Id = matcher4.id();
+    *config.add_atom_matcher() = matcher4;
+
+    Predicate predicate1;
+    predicate1.set_id(StringToId("TEST1"));
+    Predicate predicate2;
+    predicate2.set_id(StringToId("TEST2"));
+    Predicate predicate3 = CreateScreenIsOnPredicate();
+    Predicate predicate4 = CreateScreenIsOffPredicate();
+    Predicate predicate5 = CreateBatterySaverModePredicate();
+
+    Predicate_Combination* combination1 = predicate1.mutable_combination();
+    combination1->set_operation(LogicalOperation::OR);
+    combination1->add_predicate(predicate3.id());
+    combination1->add_predicate(predicate4.id());
+
+    Predicate_Combination* combination2 = predicate2.mutable_combination();
+    combination2->set_operation(LogicalOperation::OR);
+    combination2->add_predicate(predicate3.id());
+    combination2->add_predicate(predicate5.id());
+
+    *config.add_predicate() = predicate1;
+    *config.add_predicate() = predicate2;
+    *config.add_predicate() = predicate3;
+    *config.add_predicate() = predicate4;
+    *config.add_predicate() = predicate5;
+
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    newAtomMatchingTrackerMap[matcher1Id] = 0;
+    newAtomMatchingTrackerMap[matcher2Id] = 1;
+    newAtomMatchingTrackerMap[matcher3Id] = 2;
+    newAtomMatchingTrackerMap[matcher4Id] = 3;
+
+    const ConfigKey key(123, 456);
+    unordered_map<int64_t, int> newConditionTrackerMap;
+    vector<sp<ConditionTracker>> newConditionTrackers;
+    unordered_map<int, vector<int>> trackerToConditionMap;
+    vector<ConditionState> conditionCache;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_TRUE(initConditions(key, config, newAtomMatchingTrackerMap, newConditionTrackerMap,
+                               newConditionTrackers, trackerToConditionMap, conditionCache,
+                               invalidEntities));
+
+    EXPECT_EQ(newConditionTrackerMap.size(), 5);
+    EXPECT_EQ(newConditionTrackerMap.at(predicate1.id()), 0);
+    EXPECT_EQ(newConditionTrackerMap.at(predicate2.id()), 1);
+    EXPECT_EQ(newConditionTrackerMap.at(predicate3.id()), 2);
+    EXPECT_EQ(newConditionTrackerMap.at(predicate4.id()), 3);
+    EXPECT_EQ(newConditionTrackerMap.at(predicate5.id()), 4);
+}
+
+TEST_F(MetricsManagerUtilTest, TestInitConditionsChildNotValid) {
+    StatsdConfig config;
+
+    AtomMatcher matcher1 = CreateScreenTurnedOnAtomMatcher();
+    int64_t matcher1Id = matcher1.id();
+    *config.add_atom_matcher() = matcher1;
+
+    AtomMatcher matcher2 = CreateScreenTurnedOffAtomMatcher();
+    int64_t matcher2Id = matcher2.id();
+    *config.add_atom_matcher() = matcher2;
+
+    Predicate predicate1;
+    predicate1.set_id(StringToId("TEST1"));
+    Predicate predicate2;  // Predicate 2 has no fields but id set.
+    predicate2.set_id(StringToId("TEST2"));
+    Predicate predicate3 = CreateScreenIsOnPredicate();
+
+    Predicate_Combination* combination1 = predicate1.mutable_combination();
+    combination1->set_operation(LogicalOperation::OR);
+    combination1->add_predicate(predicate2.id());
+    combination1->add_predicate(predicate3.id());
+
+    *config.add_predicate() = predicate1;
+    *config.add_predicate() = predicate2;
+    *config.add_predicate() = predicate3;
+
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    newAtomMatchingTrackerMap[matcher1Id] = 0;
+    newAtomMatchingTrackerMap[matcher2Id] = 1;
+
+    const ConfigKey key(123, 456);
+    unordered_map<int64_t, int> newConditionTrackerMap;
+    vector<sp<ConditionTracker>> newConditionTrackers;
+    unordered_map<int, vector<int>> trackerToConditionMap;
+    vector<ConditionState> conditionCache;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_FALSE(initConditions(key, config, newAtomMatchingTrackerMap, newConditionTrackerMap,
+                                newConditionTrackers, trackerToConditionMap, conditionCache,
+                                invalidEntities));
+
+    EXPECT_EQ(invalidEntities.size(), 2);
+    InvalidConfigReason reason =
+            invalidEntities[InvalidEntityKey{predicate1.id(), INVALID_ENTITY_TYPE_PREDICATE}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_CONDITION_CHILD_NOT_FOUND);
+    EXPECT_THAT(reason.conditionIds, UnorderedElementsAreArray({predicate1.id(), predicate2.id()}));
+
+    reason = invalidEntities[InvalidEntityKey{predicate2.id(), INVALID_ENTITY_TYPE_PREDICATE}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_CONDITION_MALFORMED_CONTENTS_CASE);
+    EXPECT_THAT(reason.conditionIds, UnorderedElementsAreArray({predicate2.id()}));
+
+    EXPECT_EQ(newConditionTrackerMap.size(), 1);
+    EXPECT_EQ(newConditionTrackerMap[predicate3.id()], 0);
+    EXPECT_EQ(newConditionTrackers[0]->getConditionId(), predicate3.id());
+}
+
+TEST_F(MetricsManagerUtilTest, TestInitConditionDependentMatcherNotValid) {
+    StatsdConfig config;
+
+    AtomMatcher matcher1 = CreateScreenTurnedOnAtomMatcher();
+    int64_t matcher1Id = matcher1.id();
+    *config.add_atom_matcher() = matcher1;
+
+    AtomMatcher matcher2 = CreateScreenTurnedOffAtomMatcher();
+    int64_t matcher2Id = matcher2.id();
+    *config.add_atom_matcher() = matcher2;
+
+    Predicate predicate1 = CreateScreenIsOnPredicate();
+
+    *config.add_predicate() = predicate1;
+
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    newAtomMatchingTrackerMap[matcher1Id] = 0;
+
+    const ConfigKey key(123, 456);
+    unordered_map<int64_t, int> newConditionTrackerMap;
+    vector<sp<ConditionTracker>> newConditionTrackers;
+    unordered_map<int, vector<int>> trackerToConditionMap;
+    vector<ConditionState> conditionCache;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+
+    invalidEntities[InvalidEntityKey{matcher2Id, INVALID_ENTITY_TYPE_MATCHER}] =
+            createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_MATCHER_SERIALIZATION_FAILED,
+                                                 matcher2Id);
+
+    EXPECT_FALSE(initConditions(key, config, newAtomMatchingTrackerMap, newConditionTrackerMap,
+                                newConditionTrackers, trackerToConditionMap, conditionCache,
+                                invalidEntities));
+
+    EXPECT_EQ(invalidEntities.size(), 2);
+    InvalidConfigReason reason =
+            invalidEntities[InvalidEntityKey{predicate1.id(), INVALID_ENTITY_TYPE_PREDICATE}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_CONDITION_INVALID_MATCHER_DEPENDENCY);
+    EXPECT_THAT(reason.conditionIds, UnorderedElementsAreArray({predicate1.id()}));
+    EXPECT_THAT(reason.matcherIds, UnorderedElementsAreArray({matcher2.id()}));
+
+    EXPECT_EQ(trackerToConditionMap.size(), 0);
+    EXPECT_EQ(newConditionTrackerMap.size(), 0);
 }
 
 }  // namespace statsd

@@ -514,15 +514,15 @@ TEST_F(ConfigUpdateTest, TestSimpleConditionPreserve) {
     EXPECT_TRUE(initConfig(config));
 
     set<int64_t> replacedMatchers;
-    vector<UpdateStatus> conditionsToUpdate(1, UPDATE_UNKNOWN);
-    vector<uint8_t> cycleTracker(1, false);
-    unordered_map<int64_t, int> newConditionTrackerMap;
-    newConditionTrackerMap[predicate.id()] = 0;
-    EXPECT_EQ(determineConditionUpdateStatus(config, 0, oldConditionTrackerMap,
-                                             oldConditionTrackers, newConditionTrackerMap,
+    unordered_map<int64_t, UpdateStatus> conditionsToUpdate;
+    unordered_set<int64_t> cycleTracker;
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
+    allConditionsMap[predicate.id()] = {predicate, nullptr};
+    EXPECT_EQ(determineConditionUpdateStatus(config, predicate, oldConditionTrackerMap,
+                                             oldConditionTrackers, allConditionsMap,
                                              replacedMatchers, conditionsToUpdate, cycleTracker),
               nullopt);
-    EXPECT_EQ(conditionsToUpdate[0], UPDATE_PRESERVE);
+    EXPECT_EQ(conditionsToUpdate[predicate.id()], UPDATE_PRESERVE);
 }
 
 TEST_F(ConfigUpdateTest, TestSimpleConditionReplace) {
@@ -541,15 +541,15 @@ TEST_F(ConfigUpdateTest, TestSimpleConditionReplace) {
     config.mutable_predicate(0)->mutable_simple_predicate()->set_count_nesting(true);
 
     set<int64_t> replacedMatchers;
-    vector<UpdateStatus> conditionsToUpdate(1, UPDATE_UNKNOWN);
-    vector<uint8_t> cycleTracker(1, false);
-    unordered_map<int64_t, int> newConditionTrackerMap;
-    newConditionTrackerMap[predicate.id()] = 0;
-    EXPECT_EQ(determineConditionUpdateStatus(config, 0, oldConditionTrackerMap,
-                                             oldConditionTrackers, newConditionTrackerMap,
+    unordered_map<int64_t, UpdateStatus> conditionsToUpdate;
+    unordered_set<int64_t> cycleTracker;
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
+    allConditionsMap[config.predicate(0).id()] = {config.predicate(0), nullptr};
+    EXPECT_EQ(determineConditionUpdateStatus(config, config.predicate(0), oldConditionTrackerMap,
+                                             oldConditionTrackers, allConditionsMap,
                                              replacedMatchers, conditionsToUpdate, cycleTracker),
               nullopt);
-    EXPECT_EQ(conditionsToUpdate[0], UPDATE_REPLACE);
+    EXPECT_EQ(conditionsToUpdate[config.predicate(0).id()], UPDATE_REPLACE);
 }
 
 TEST_F(ConfigUpdateTest, TestSimpleConditionDepsChange) {
@@ -569,15 +569,15 @@ TEST_F(ConfigUpdateTest, TestSimpleConditionDepsChange) {
     set<int64_t> replacedMatchers;
     replacedMatchers.insert(startMatcherId);
 
-    vector<UpdateStatus> conditionsToUpdate(1, UPDATE_UNKNOWN);
-    vector<uint8_t> cycleTracker(1, false);
-    unordered_map<int64_t, int> newConditionTrackerMap;
-    newConditionTrackerMap[predicate.id()] = 0;
-    EXPECT_EQ(determineConditionUpdateStatus(config, 0, oldConditionTrackerMap,
-                                             oldConditionTrackers, newConditionTrackerMap,
+    unordered_map<int64_t, UpdateStatus> conditionsToUpdate;
+    unordered_set<int64_t> cycleTracker;
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
+    allConditionsMap[predicate.id()] = {predicate, nullptr};
+    EXPECT_EQ(determineConditionUpdateStatus(config, predicate, oldConditionTrackerMap,
+                                             oldConditionTrackers, allConditionsMap,
                                              replacedMatchers, conditionsToUpdate, cycleTracker),
               nullopt);
-    EXPECT_EQ(conditionsToUpdate[0], UPDATE_REPLACE);
+    EXPECT_EQ(conditionsToUpdate[predicate.id()], UPDATE_REPLACE);
 }
 
 TEST_F(ConfigUpdateTest, TestCombinationConditionPreserve) {
@@ -604,25 +604,25 @@ TEST_F(ConfigUpdateTest, TestCombinationConditionPreserve) {
 
     // Same predicates, different order
     StatsdConfig newConfig;
-    unordered_map<int64_t, int> newConditionTrackerMap;
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
     *newConfig.add_predicate() = combination1;
-    newConditionTrackerMap[combination1.id()] = 0;
+    allConditionsMap[combination1.id()] = {combination1, nullptr};
     *newConfig.add_predicate() = simple2;
-    newConditionTrackerMap[simple2.id()] = 1;
+    allConditionsMap[simple2.id()] = {simple2, nullptr};
     *newConfig.add_predicate() = simple1;
-    newConditionTrackerMap[simple1.id()] = 2;
+    allConditionsMap[simple1.id()] = {simple1, nullptr};
 
     set<int64_t> replacedMatchers;
-    vector<UpdateStatus> conditionsToUpdate(3, UPDATE_UNKNOWN);
-    vector<uint8_t> cycleTracker(3, false);
+    unordered_map<int64_t, UpdateStatus> conditionsToUpdate;
+    unordered_set<int64_t> cycleTracker;
     // Only update the combination. It should recurse the two child predicates and preserve all 3.
-    EXPECT_EQ(determineConditionUpdateStatus(newConfig, 0, oldConditionTrackerMap,
-                                             oldConditionTrackers, newConditionTrackerMap,
+    EXPECT_EQ(determineConditionUpdateStatus(newConfig, combination1, oldConditionTrackerMap,
+                                             oldConditionTrackers, allConditionsMap,
                                              replacedMatchers, conditionsToUpdate, cycleTracker),
               nullopt);
-    EXPECT_EQ(conditionsToUpdate[0], UPDATE_PRESERVE);
-    EXPECT_EQ(conditionsToUpdate[1], UPDATE_PRESERVE);
-    EXPECT_EQ(conditionsToUpdate[2], UPDATE_PRESERVE);
+    EXPECT_EQ(conditionsToUpdate[combination1.id()], UPDATE_PRESERVE);
+    EXPECT_EQ(conditionsToUpdate[simple2.id()], UPDATE_PRESERVE);
+    EXPECT_EQ(conditionsToUpdate[simple1.id()], UPDATE_PRESERVE);
 }
 
 TEST_F(ConfigUpdateTest, TestCombinationConditionReplace) {
@@ -651,25 +651,25 @@ TEST_F(ConfigUpdateTest, TestCombinationConditionReplace) {
     combination1.mutable_combination()->set_operation(LogicalOperation::OR);
 
     StatsdConfig newConfig;
-    unordered_map<int64_t, int> newConditionTrackerMap;
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
     *newConfig.add_predicate() = combination1;
-    newConditionTrackerMap[combination1.id()] = 0;
+    allConditionsMap[combination1.id()] = {combination1, nullptr};
     *newConfig.add_predicate() = simple2;
-    newConditionTrackerMap[simple2.id()] = 1;
+    allConditionsMap[simple2.id()] = {simple2, nullptr};
     *newConfig.add_predicate() = simple1;
-    newConditionTrackerMap[simple1.id()] = 2;
+    allConditionsMap[simple1.id()] = {simple1, nullptr};
 
     set<int64_t> replacedMatchers;
-    vector<UpdateStatus> conditionsToUpdate(3, UPDATE_UNKNOWN);
-    vector<uint8_t> cycleTracker(3, false);
+    unordered_map<int64_t, UpdateStatus> conditionsToUpdate;
+    unordered_set<int64_t> cycleTracker;
     // Only update the combination. The simple conditions should not be evaluated.
-    EXPECT_EQ(determineConditionUpdateStatus(newConfig, 0, oldConditionTrackerMap,
-                                             oldConditionTrackers, newConditionTrackerMap,
+    EXPECT_EQ(determineConditionUpdateStatus(newConfig, combination1, oldConditionTrackerMap,
+                                             oldConditionTrackers, allConditionsMap,
                                              replacedMatchers, conditionsToUpdate, cycleTracker),
               nullopt);
-    EXPECT_EQ(conditionsToUpdate[0], UPDATE_REPLACE);
-    EXPECT_EQ(conditionsToUpdate[1], UPDATE_UNKNOWN);
-    EXPECT_EQ(conditionsToUpdate[2], UPDATE_UNKNOWN);
+    EXPECT_EQ(conditionsToUpdate[combination1.id()], UPDATE_REPLACE);
+    EXPECT_EQ(conditionsToUpdate[simple2.id()], UPDATE_UNKNOWN);
+    EXPECT_EQ(conditionsToUpdate[simple1.id()], UPDATE_UNKNOWN);
 }
 
 TEST_F(ConfigUpdateTest, TestCombinationConditionDepsChange) {
@@ -697,24 +697,24 @@ TEST_F(ConfigUpdateTest, TestCombinationConditionDepsChange) {
     simple2.mutable_simple_predicate()->set_count_nesting(false);
 
     StatsdConfig newConfig;
-    unordered_map<int64_t, int> newConditionTrackerMap;
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
     *newConfig.add_predicate() = combination1;
-    newConditionTrackerMap[combination1.id()] = 0;
+    allConditionsMap[combination1.id()] = {combination1, nullptr};
     *newConfig.add_predicate() = simple2;
-    newConditionTrackerMap[simple2.id()] = 1;
+    allConditionsMap[simple2.id()] = {simple2, nullptr};
     *newConfig.add_predicate() = simple1;
-    newConditionTrackerMap[simple1.id()] = 2;
+    allConditionsMap[simple1.id()] = {simple1, nullptr};
 
     set<int64_t> replacedMatchers;
-    vector<UpdateStatus> conditionsToUpdate(3, UPDATE_UNKNOWN);
-    vector<uint8_t> cycleTracker(3, false);
+    unordered_map<int64_t, UpdateStatus> conditionsToUpdate;
+    unordered_set<int64_t> cycleTracker;
     // Only update the combination. Simple2 and combination1 must be evaluated.
-    EXPECT_EQ(determineConditionUpdateStatus(newConfig, 0, oldConditionTrackerMap,
-                                             oldConditionTrackers, newConditionTrackerMap,
+    EXPECT_EQ(determineConditionUpdateStatus(newConfig, combination1, oldConditionTrackerMap,
+                                             oldConditionTrackers, allConditionsMap,
                                              replacedMatchers, conditionsToUpdate, cycleTracker),
               nullopt);
-    EXPECT_EQ(conditionsToUpdate[0], UPDATE_REPLACE);
-    EXPECT_EQ(conditionsToUpdate[1], UPDATE_REPLACE);
+    EXPECT_EQ(conditionsToUpdate[combination1.id()], UPDATE_REPLACE);
+    EXPECT_EQ(conditionsToUpdate[simple2.id()], UPDATE_REPLACE);
 }
 
 TEST_F(ConfigUpdateTest, TestUpdateConditions) {
@@ -847,11 +847,11 @@ TEST_F(ConfigUpdateTest, TestUpdateConditions) {
     unordered_map<int, vector<int>> trackerToConditionMap;
     vector<ConditionState> conditionCache;
     set<int64_t> replacedConditions;
-    EXPECT_EQ(updateConditions(key, newConfig, newAtomMatchingTrackerMap, replacedMatchers,
-                               oldConditionTrackerMap, oldConditionTrackers, newConditionTrackerMap,
-                               newConditionTrackers, trackerToConditionMap, conditionCache,
-                               replacedConditions),
-              nullopt);
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_TRUE(updateConditions(
+            key, newConfig, newAtomMatchingTrackerMap, replacedMatchers, oldConditionTrackerMap,
+            oldConditionTrackers, newConditionTrackerMap, newConditionTrackers,
+            trackerToConditionMap, conditionCache, replacedConditions, invalidEntities));
 
     unordered_map<int64_t, int> expectedConditionTrackerMap = {
             {simple1Id, simple1Index},           {simple2Id, simple2Index},
@@ -861,10 +861,6 @@ TEST_F(ConfigUpdateTest, TestUpdateConditions) {
     EXPECT_THAT(newConditionTrackerMap, ContainerEq(expectedConditionTrackerMap));
 
     ASSERT_EQ(newConditionTrackers.size(), 6);
-    // Make sure all conditions are initialized:
-    for (const sp<ConditionTracker>& tracker : newConditionTrackers) {
-        EXPECT_TRUE(tracker->mInitialized);
-    }
 
     // Make sure preserved conditions are the same.
     EXPECT_EQ(oldConditionTrackers[oldConditionTrackerMap.at(simple1Id)],
@@ -2685,21 +2681,28 @@ TEST_F(ConfigUpdateTest, TestUpdateDurationMetrics) {
     vector<sp<ConditionTracker>> newConditionTrackers(5);
     reverse_copy(oldConditionTrackers.begin(), oldConditionTrackers.end(),
                  newConditionTrackers.begin());
+    unordered_map<int64_t, ConditionProtoAndTracker> allConditionsMap;
+    allConditionsMap[predicate1Id] = {config.predicate(0), newConditionTrackers[predicate1Index]};
+    allConditionsMap[predicate2Id] = {config.predicate(1), newConditionTrackers[predicate2Index]};
+    allConditionsMap[predicate3Id] = {config.predicate(2), newConditionTrackers[predicate3Index]};
+    allConditionsMap[predicate4Id] = {config.predicate(3), newConditionTrackers[predicate4Index]};
+    allConditionsMap[predicate5Id] = {config.predicate(4), newConditionTrackers[predicate5Index]};
     vector<Predicate> conditionProtos(5);
     reverse_copy(config.predicate().begin(), config.predicate().end(), conditionProtos.begin());
+    unordered_set<int64_t> cycleTracker;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
     for (int i = 0; i < newConditionTrackers.size(); i++) {
-        EXPECT_EQ(newConditionTrackers[i]->onConfigUpdated(conditionProtos, i, newConditionTrackers,
-                                                           newAtomMatchingTrackerMap,
-                                                           newConditionTrackerMap),
-                  nullopt);
+        EXPECT_EQ(newConditionTrackers[i]->isTrackerValid(allConditionsMap, cycleTracker), nullopt);
+        newConditionTrackers[i]->onConfigUpdated(allConditionsMap, i, newConditionTrackers,
+                                                 newAtomMatchingTrackerMap, newConditionTrackerMap);
     }
-    vector<uint8_t> cycleTracker(5, false);
     fill(conditionCache.begin(), conditionCache.end(), ConditionState::kNotEvaluated);
+    unordered_set<int64_t> initializedConditions;
     for (int i = 0; i < newConditionTrackers.size(); i++) {
-        EXPECT_EQ(
-                newConditionTrackers[i]->init(conditionProtos, newConditionTrackers,
-                                              newConditionTrackerMap, cycleTracker, conditionCache),
-                nullopt);
+        EXPECT_EQ(newConditionTrackers[i]->isTrackerValid(allConditionsMap, cycleTracker), nullopt);
+        newConditionTrackers[i]->init(i, allConditionsMap, newConditionTrackers,
+                                      newConditionTrackerMap, newAtomMatchingTrackerMap,
+                                      initializedConditions, conditionCache);
     }
     // Predicate5 should be true since 2 uids have wakelocks
     EXPECT_EQ(conditionCache, vector({kTrue, kFalse, kUnknown, kUnknown, kUnknown}));
@@ -4118,10 +4121,13 @@ TEST_F(ConfigUpdateTest, TestConditionDuplicate) {
     vector<ConditionState> conditionCache;
     set<int64_t> replacedConditions;
     set<int64_t> replacedMatchers;
-    EXPECT_EQ(updateConditions(key, config, newAtomMatchingTrackerMap, replacedMatchers,
-                               oldConditionTrackerMap, oldConditionTrackers, newConditionTrackerMap,
-                               newConditionTrackers, trackerToConditionMap, conditionCache,
-                               replacedConditions),
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_FALSE(updateConditions(
+            key, config, newAtomMatchingTrackerMap, replacedMatchers, oldConditionTrackerMap,
+            oldConditionTrackers, newConditionTrackerMap, newConditionTrackers,
+            trackerToConditionMap, conditionCache, replacedConditions, invalidEntities));
+    EXPECT_EQ(invalidEntities[(
+                      InvalidEntityKey{StringToId("ScreenIsOn"), INVALID_ENTITY_TYPE_PREDICATE})],
               createInvalidConfigReasonWithPredicate(INVALID_CONFIG_REASON_CONDITION_DUPLICATE,
                                                      StringToId("ScreenIsOn")));
 }
@@ -4321,6 +4327,244 @@ TEST_F(ConfigUpdateTest, TestUpdateConfigMatcherNoCycle) {
                                        newAtomMatchingTrackers, {matcher2.id(), matcher4.id()})));
     EXPECT_THAT(newTagIds[12], UnorderedElementsAreArray(filterMatcherIndexesById(
                                        newAtomMatchingTrackers, {matcher3.id(), matcher5.id()})));
+}
+
+TEST_F(ConfigUpdateTest, TestUpdateConfigConditionHasCycle) {
+    StatsdConfig config;
+
+    EXPECT_TRUE(initConfig(config));
+
+    AtomMatcher matcher1 = CreateScreenTurnedOnAtomMatcher();
+    int64_t matcher1Id = matcher1.id();
+    *config.add_atom_matcher() = matcher1;
+
+    AtomMatcher matcher2 = CreateScreenTurnedOffAtomMatcher();
+    int64_t matcher2Id = matcher2.id();
+    *config.add_atom_matcher() = matcher2;
+
+    Predicate predicate1;
+    predicate1.set_id(StringToId("TEST1"));
+    Predicate predicate2;
+    predicate2.set_id(StringToId("TEST2"));
+    Predicate predicate3 = CreateScreenIsOnPredicate();
+
+    Predicate_Combination* combination1 = predicate1.mutable_combination();
+    combination1->set_operation(LogicalOperation::OR);
+    combination1->add_predicate(predicate2.id());
+    combination1->add_predicate(predicate3.id());
+
+    Predicate_Combination* combination2 = predicate2.mutable_combination();
+    combination2->set_operation(LogicalOperation::OR);
+    combination2->add_predicate(predicate1.id());
+    combination2->add_predicate(predicate3.id());
+
+    *config.add_predicate() = predicate1;
+    *config.add_predicate() = predicate2;
+    *config.add_predicate() = predicate3;
+
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    newAtomMatchingTrackerMap[matcher1Id] = 0;
+    newAtomMatchingTrackerMap[matcher2Id] = 1;
+
+    set<int64_t> replacedMatchers;
+    unordered_map<int64_t, int> newConditionTrackerMap;
+    vector<sp<ConditionTracker>> newConditionTrackers;
+    unordered_map<int, vector<int>> trackerToConditionMap;
+    vector<ConditionState> conditionCache;
+    set<int64_t> replacedConditions;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_FALSE(updateConditions(
+            key, config, newAtomMatchingTrackerMap, replacedMatchers, oldConditionTrackerMap,
+            oldConditionTrackers, newConditionTrackerMap, newConditionTrackers,
+            trackerToConditionMap, conditionCache, replacedConditions, invalidEntities));
+
+    EXPECT_EQ(invalidEntities.size(), 2);
+    InvalidConfigReason reason =
+            invalidEntities[InvalidEntityKey{predicate1.id(), INVALID_ENTITY_TYPE_PREDICATE}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_CONDITION_CYCLE);
+    EXPECT_THAT(reason.conditionIds, UnorderedElementsAreArray({predicate1.id(), predicate2.id()}));
+
+    reason = invalidEntities[InvalidEntityKey{predicate2.id(), INVALID_ENTITY_TYPE_PREDICATE}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_CONDITION_CYCLE);
+    EXPECT_THAT(reason.conditionIds, UnorderedElementsAreArray({predicate1.id(), predicate2.id()}));
+
+    EXPECT_EQ(newConditionTrackerMap.size(), 1);
+    EXPECT_EQ(newConditionTrackerMap[predicate3.id()], 0);
+    EXPECT_EQ(newConditionTrackers[0]->getConditionId(), predicate3.id());
+}
+
+TEST_F(ConfigUpdateTest, TestUpdateConfigConditionNoCycle) {
+    StatsdConfig config;
+
+    EXPECT_TRUE(initConfig(config));
+
+    AtomMatcher matcher1 = CreateScreenTurnedOnAtomMatcher();
+    int64_t matcher1Id = matcher1.id();
+    *config.add_atom_matcher() = matcher1;
+
+    AtomMatcher matcher2 = CreateScreenTurnedOffAtomMatcher();
+    int64_t matcher2Id = matcher2.id();
+    *config.add_atom_matcher() = matcher2;
+
+    AtomMatcher matcher3 = CreateBatterySaverModeStartAtomMatcher();
+    int64_t matcher4Id = matcher3.id();
+    *config.add_atom_matcher() = matcher3;
+
+    AtomMatcher matcher4 = CreateBatterySaverModeStopAtomMatcher();
+    int64_t matcher3Id = matcher4.id();
+    *config.add_atom_matcher() = matcher4;
+
+    Predicate predicate1;
+    predicate1.set_id(StringToId("TEST1"));
+    Predicate predicate2;
+    predicate2.set_id(StringToId("TEST2"));
+    Predicate predicate3 = CreateScreenIsOnPredicate();
+    Predicate predicate4 = CreateScreenIsOffPredicate();
+    Predicate predicate5 = CreateBatterySaverModePredicate();
+
+    Predicate_Combination* combination1 = predicate1.mutable_combination();
+    combination1->set_operation(LogicalOperation::OR);
+    combination1->add_predicate(predicate3.id());
+    combination1->add_predicate(predicate4.id());
+
+    Predicate_Combination* combination2 = predicate2.mutable_combination();
+    combination2->set_operation(LogicalOperation::OR);
+    combination2->add_predicate(predicate3.id());
+    combination2->add_predicate(predicate5.id());
+
+    *config.add_predicate() = predicate1;
+    *config.add_predicate() = predicate2;
+    *config.add_predicate() = predicate3;
+    *config.add_predicate() = predicate4;
+    *config.add_predicate() = predicate5;
+
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    newAtomMatchingTrackerMap[matcher1Id] = 0;
+    newAtomMatchingTrackerMap[matcher2Id] = 1;
+    newAtomMatchingTrackerMap[matcher3Id] = 2;
+    newAtomMatchingTrackerMap[matcher4Id] = 3;
+
+    set<int64_t> replacedMatchers;
+    unordered_map<int64_t, int> newConditionTrackerMap;
+    vector<sp<ConditionTracker>> newConditionTrackers;
+    unordered_map<int, vector<int>> trackerToConditionMap;
+    vector<ConditionState> conditionCache;
+    set<int64_t> replacedConditions;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_TRUE(updateConditions(
+            key, config, newAtomMatchingTrackerMap, replacedMatchers, oldConditionTrackerMap,
+            oldConditionTrackers, newConditionTrackerMap, newConditionTrackers,
+            trackerToConditionMap, conditionCache, replacedConditions, invalidEntities));
+
+    for (auto& [predicateId, predicateIndex] : newConditionTrackerMap) {
+        EXPECT_EQ(newConditionTrackers[newConditionTrackerMap[predicateId]]->getConditionId(),
+                  predicateId);
+    }
+}
+
+TEST_F(ConfigUpdateTest, TestUpdateConfigConditionChildNotValid) {
+    StatsdConfig config;
+
+    EXPECT_TRUE(initConfig(config));
+
+    AtomMatcher matcher1 = CreateScreenTurnedOnAtomMatcher();
+    int64_t matcher1Id = matcher1.id();
+    *config.add_atom_matcher() = matcher1;
+
+    AtomMatcher matcher2 = CreateScreenTurnedOffAtomMatcher();
+    int64_t matcher2Id = matcher2.id();
+    *config.add_atom_matcher() = matcher2;
+
+    Predicate predicate1;
+    predicate1.set_id(StringToId("TEST1"));
+    Predicate predicate2;  // Predicate 2 has no fields but id set.
+    predicate2.set_id(StringToId("TEST2"));
+    Predicate predicate3 = CreateScreenIsOnPredicate();
+
+    Predicate_Combination* combination1 = predicate1.mutable_combination();
+    combination1->set_operation(LogicalOperation::OR);
+    combination1->add_predicate(predicate2.id());
+    combination1->add_predicate(predicate3.id());
+
+    *config.add_predicate() = predicate1;
+    *config.add_predicate() = predicate2;
+    *config.add_predicate() = predicate3;
+
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    newAtomMatchingTrackerMap[matcher1Id] = 0;
+    newAtomMatchingTrackerMap[matcher2Id] = 1;
+
+    set<int64_t> replacedMatchers;
+    unordered_map<int64_t, int> newConditionTrackerMap;
+    vector<sp<ConditionTracker>> newConditionTrackers;
+    unordered_map<int, vector<int>> trackerToConditionMap;
+    vector<ConditionState> conditionCache;
+    set<int64_t> replacedConditions;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_FALSE(updateConditions(
+            key, config, newAtomMatchingTrackerMap, replacedMatchers, oldConditionTrackerMap,
+            oldConditionTrackers, newConditionTrackerMap, newConditionTrackers,
+            trackerToConditionMap, conditionCache, replacedConditions, invalidEntities));
+
+    EXPECT_EQ(invalidEntities.size(), 2);
+    InvalidConfigReason reason =
+            invalidEntities[InvalidEntityKey{predicate1.id(), INVALID_ENTITY_TYPE_PREDICATE}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_CONDITION_CHILD_NOT_FOUND);
+    EXPECT_THAT(reason.conditionIds, UnorderedElementsAreArray({predicate1.id(), predicate2.id()}));
+
+    reason = invalidEntities[InvalidEntityKey{predicate2.id(), INVALID_ENTITY_TYPE_PREDICATE}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_CONDITION_MALFORMED_CONTENTS_CASE);
+    EXPECT_THAT(reason.conditionIds, UnorderedElementsAreArray({predicate2.id()}));
+
+    EXPECT_EQ(newConditionTrackerMap.size(), 1);
+    EXPECT_EQ(newConditionTrackerMap[predicate3.id()], 0);
+    EXPECT_EQ(newConditionTrackers[0]->getConditionId(), predicate3.id());
+}
+
+TEST_F(ConfigUpdateTest, TestUpdateConfigConditionDependentMatcherNotValid) {
+    StatsdConfig config;
+
+    EXPECT_TRUE(initConfig(config));
+
+    AtomMatcher matcher1 = CreateScreenTurnedOnAtomMatcher();
+    int64_t matcher1Id = matcher1.id();
+    *config.add_atom_matcher() = matcher1;
+
+    AtomMatcher matcher2 = CreateScreenTurnedOffAtomMatcher();
+    int64_t matcher2Id = matcher2.id();
+    *config.add_atom_matcher() = matcher2;
+
+    Predicate predicate1 = CreateScreenIsOnPredicate();
+
+    *config.add_predicate() = predicate1;
+
+    unordered_map<int64_t, int> newAtomMatchingTrackerMap;
+    newAtomMatchingTrackerMap[matcher1Id] = 0;
+
+    set<int64_t> replacedMatchers;
+    unordered_map<int64_t, int> newConditionTrackerMap;
+    vector<sp<ConditionTracker>> newConditionTrackers;
+    unordered_map<int, vector<int>> trackerToConditionMap;
+    vector<ConditionState> conditionCache;
+    set<int64_t> replacedConditions;
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+
+    invalidEntities[InvalidEntityKey{matcher2Id, INVALID_ENTITY_TYPE_MATCHER}] =
+            createInvalidConfigReasonWithMatcher(INVALID_CONFIG_REASON_MATCHER_SERIALIZATION_FAILED,
+                                                 matcher2Id);
+
+    EXPECT_FALSE(updateConditions(
+            key, config, newAtomMatchingTrackerMap, replacedMatchers, oldConditionTrackerMap,
+            oldConditionTrackers, newConditionTrackerMap, newConditionTrackers,
+            trackerToConditionMap, conditionCache, replacedConditions, invalidEntities));
+
+    EXPECT_EQ(invalidEntities.size(), 2);
+    InvalidConfigReason reason =
+            invalidEntities[InvalidEntityKey{predicate1.id(), INVALID_ENTITY_TYPE_PREDICATE}];
+    EXPECT_EQ(reason.reason, INVALID_CONFIG_REASON_CONDITION_INVALID_MATCHER_DEPENDENCY);
+    EXPECT_THAT(reason.conditionIds, UnorderedElementsAreArray({predicate1.id()}));
+
+    EXPECT_EQ(newConditionTrackerMap.size(), 0);
 }
 
 TEST_P(ConfigUpdateDimLimitTest, TestDimLimit) {

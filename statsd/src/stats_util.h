@@ -36,6 +36,21 @@ enum UpdateStatus {
     UPDATE_NEW = 3,
 };
 
+enum InvalidEntityType {
+    INVALID_ENTITY_TYPE_UNKNOWN = 0,
+    INVALID_ENTITY_TYPE_MATCHER = 1,
+    INVALID_ENTITY_TYPE_PREDICATE = 2,
+};
+
+struct InvalidEntityKey {
+    int64_t id;
+    InvalidEntityType entityType;
+
+    bool operator==(const InvalidEntityKey& other) const {
+        return id == other.id && entityType == other.entityType;
+    }
+};
+
 const HashableDimensionKey DEFAULT_DIMENSION_KEY = HashableDimensionKey();
 const MetricDimensionKey DEFAULT_METRIC_DIMENSION_KEY = MetricDimensionKey();
 
@@ -68,3 +83,13 @@ inline bool shouldKeepRandomSample(int samplingPercentage) {
 }  // namespace statsd
 }  // namespace os
 }  // namespace android
+
+template <>
+struct std::hash<android::os::statsd::InvalidEntityKey> {
+    std::size_t operator()(const android::os::statsd::InvalidEntityKey& invalidEntityKey) const {
+        android::hash_t hash = 0;
+        hash = android::JenkinsHashMix(hash, android::hash_type((int64_t)invalidEntityKey.id));
+        hash = android::JenkinsHashMix(hash, android::hash_type((int)invalidEntityKey.entityType));
+        return android::JenkinsHashWhiten(hash);
+    }
+};

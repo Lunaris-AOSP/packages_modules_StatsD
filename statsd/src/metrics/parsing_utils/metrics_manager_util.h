@@ -33,20 +33,6 @@ namespace android {
 namespace os {
 namespace statsd {
 
-enum InvalidEntityType {
-    INVALID_ENTITY_TYPE_UNKNOWN = 0,
-    INVALID_ENTITY_TYPE_MATCHER = 1,
-};
-
-struct InvalidEntityKey {
-    int64_t id;
-    InvalidEntityType entityType;
-
-    bool operator==(const InvalidEntityKey& other) const {
-        return id == other.id && entityType == other.entityType;
-    }
-};
-
 // Helper functions for creating, validating, and updating config components from StatsdConfig.
 // Should only be called from metrics_manager_util and config_update_utils.
 
@@ -64,13 +50,12 @@ sp<AtomMatchingTracker> createAtomMatchingTracker(
 // input:
 // [predicate]: the input Predicate from the StatsdConfig
 // [index]: the index of the condition tracker
-// [atomMatchingTrackerMap]: map of atom matcher id to its index in allAtomMatchingTrackers
 // [invalidConfigReason]: logging ids if config is invalid
 // output:
 // new ConditionTracker, or null if the tracker is unable to be created
 sp<ConditionTracker> createConditionTracker(
-        const ConfigKey& key, const Predicate& predicate, int index,
-        const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
+        const ConfigKey& key, const Predicate& predicate,
+        const std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities,
         std::optional<InvalidConfigReason>& invalidConfigReason);
 
 // Get the hash of a metric, combining the activation if the metric has one.
@@ -327,14 +312,15 @@ bool initAtomMatchingTrackers(
 // [trackerToConditionMap]: contain the mapping from index of
 //                        log tracker to condition trackers that use the log tracker
 // [initialConditionCache]: stores the initial conditions for each ConditionTracker
-// Returns nullopt if successful and InvalidConfigReason if not.
-std::optional<InvalidConfigReason> initConditions(
-        const ConfigKey& key, const StatsdConfig& config,
-        const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
-        std::unordered_map<int64_t, int>& conditionTrackerMap,
-        std::vector<sp<ConditionTracker>>& allConditionTrackers,
-        std::unordered_map<int, std::vector<int>>& trackerToConditionMap,
-        std::vector<ConditionState>& initialConditionCache);
+// [invalidEntities]: a map of entity id to the reason why the entity is invalid
+// Returns whether all conditions are valid
+bool initConditions(const ConfigKey& key, const StatsdConfig& config,
+                    const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
+                    std::unordered_map<int64_t, int>& conditionTrackerMap,
+                    std::vector<sp<ConditionTracker>>& allConditionTrackers,
+                    std::unordered_map<int, std::vector<int>>& trackerToConditionMap,
+                    std::vector<ConditionState>& initialConditionCache,
+                    std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 // Initialize State maps using State protos in the config. These maps will
 // eventually be passed to MetricProducers to initialize their state info.
@@ -420,13 +406,3 @@ std::optional<InvalidConfigReason> initStatsdConfig(
 }  // namespace statsd
 }  // namespace os
 }  // namespace android
-
-template <>
-struct std::hash<android::os::statsd::InvalidEntityKey> {
-    std::size_t operator()(const android::os::statsd::InvalidEntityKey& invalidEntityKey) const {
-        android::hash_t hash = 0;
-        hash = android::JenkinsHashMix(hash, android::hash_type((int64_t)invalidEntityKey.id));
-        hash = android::JenkinsHashMix(hash, android::hash_type((int)invalidEntityKey.entityType));
-        return JenkinsHashWhiten(hash);
-    }
-};
