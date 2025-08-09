@@ -78,7 +78,6 @@ const int FIELD_ID_AGGREGATED_ATOM = 9;
 // for AggregatedAtomInfo
 const int FIELD_ID_ATOM_VALUE = 1;
 const int FIELD_ID_ATOM_TIMESTAMPS = 2;
-const int FIELD_ID_AGGREGATED_STATE = 3;
 
 // Converts the Value to a double.
 // Returns an std::optional<double> which will be empty if the Value is not numeric.
