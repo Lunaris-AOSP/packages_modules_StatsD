@@ -331,11 +331,12 @@ bool initConditions(const ConfigKey& key, const StatsdConfig& config,
 // [allStateGroupMaps]: this map should contain the mapping from states ids and state
 //                      values to state group ids for all states
 // [stateProtoHashes]: contains a map of state id to the hash of the State proto from the config
-// Returns nullopt if successful and InvalidConfigReason if not.
-std::optional<InvalidConfigReason> initStates(
-        const StatsdConfig& config, std::unordered_map<int64_t, int>& stateAtomIdMap,
-        std::unordered_map<int64_t, std::unordered_map<int, int64_t>>& allStateGroupMaps,
-        std::map<int64_t, uint64_t>& stateProtoHashes);
+// [invalidEntities]: map of entity id to the reason why it is invalid.
+// Returns true if all states are valid.
+bool initStates(const StatsdConfig& config, std::unordered_map<int64_t, int>& stateAtomIdMap,
+                std::unordered_map<int64_t, std::unordered_map<int, int64_t>>& allStateGroupMaps,
+                std::map<int64_t, uint64_t>& stateProtoHashes,
+                std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 // Initialize MetricProducers.
 // input:

@@ -128,11 +128,13 @@ bool updateConditions(const ConfigKey& key, const StatsdConfig& config,
                       std::set<int64_t>& replacedConditions,
                       std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
-std::optional<InvalidConfigReason> updateStates(
-        const StatsdConfig& config, const std::map<int64_t, uint64_t>& oldStateProtoHashes,
-        std::unordered_map<int64_t, int>& stateAtomIdMap,
-        std::unordered_map<int64_t, std::unordered_map<int, int64_t>>& allStateGroupMaps,
-        std::map<int64_t, uint64_t>& newStateProtoHashes, std::set<int64_t>& replacedStates);
+bool updateStates(const StatsdConfig& config,
+                  const std::map<int64_t, uint64_t>& oldStateProtoHashes,
+                  std::unordered_map<int64_t, int>& stateAtomIdMap,
+                  std::unordered_map<int64_t, std::unordered_map<int, int64_t>>& allStateGroupMaps,
+                  std::map<int64_t, uint64_t>& newStateProtoHashes,
+                  std::set<int64_t>& replacedStates,
+                  std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 // Function to determine the update status (preserve/replace/new) of all metrics in the config.
 // [config]: the input StatsdConfig

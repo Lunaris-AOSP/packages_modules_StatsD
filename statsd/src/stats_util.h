@@ -40,6 +40,7 @@ enum InvalidEntityType {
     INVALID_ENTITY_TYPE_UNKNOWN = 0,
     INVALID_ENTITY_TYPE_MATCHER = 1,
     INVALID_ENTITY_TYPE_PREDICATE = 2,
+    INVALID_ENTITY_TYPE_STATE = 3,
 };
 
 struct InvalidEntityKey {

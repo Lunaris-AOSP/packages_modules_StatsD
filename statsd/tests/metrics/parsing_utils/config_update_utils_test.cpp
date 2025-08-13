@@ -978,9 +978,9 @@ TEST_F(ConfigUpdateTest, TestUpdateStates) {
     unordered_map<int64_t, unordered_map<int, int64_t>> allStateGroupMaps;
     map<int64_t, uint64_t> newStateProtoHashes;
     set<int64_t> replacedStates;
-    EXPECT_EQ(updateStates(newConfig, oldStateHashes, stateAtomIdMap, allStateGroupMaps,
-                           newStateProtoHashes, replacedStates),
-              nullopt);
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_TRUE(updateStates(newConfig, oldStateHashes, stateAtomIdMap, allStateGroupMaps,
+                             newStateProtoHashes, replacedStates, invalidEntities));
     EXPECT_THAT(replacedStates, ContainerEq(set({state1Id, state3Id})));
 
     unordered_map<int64_t, int> expectedStateAtomIdMap = {
@@ -2181,7 +2181,9 @@ TEST_F(ConfigUpdateTest, TestUpdateCountMetrics) {
     unordered_map<int64_t, int> stateAtomIdMap;
     unordered_map<int64_t, unordered_map<int, int64_t>> allStateGroupMaps;
     map<int64_t, uint64_t> stateProtoHashes;
-    EXPECT_EQ(initStates(newConfig, stateAtomIdMap, allStateGroupMaps, stateProtoHashes), nullopt);
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_TRUE(initStates(newConfig, stateAtomIdMap, allStateGroupMaps, stateProtoHashes,
+                           invalidEntities));
     EXPECT_EQ(stateAtomIdMap[state2Id], util::BATTERY_SAVER_MODE_STATE_CHANGED);
 
     // Output data structures to validate.
@@ -2727,7 +2729,8 @@ TEST_F(ConfigUpdateTest, TestUpdateDurationMetrics) {
     unordered_map<int64_t, int> stateAtomIdMap;
     unordered_map<int64_t, unordered_map<int, int64_t>> allStateGroupMaps;
     map<int64_t, uint64_t> stateProtoHashes;
-    EXPECT_EQ(initStates(newConfig, stateAtomIdMap, allStateGroupMaps, stateProtoHashes), nullopt);
+    EXPECT_TRUE(initStates(newConfig, stateAtomIdMap, allStateGroupMaps, stateProtoHashes,
+                           invalidEntities));
 
     // Output data structures to validate.
     unordered_map<int64_t, int> newMetricProducerMap;
@@ -2996,7 +2999,9 @@ TEST_F(ConfigUpdateTest, TestUpdateValueMetrics) {
     unordered_map<int64_t, int> stateAtomIdMap;
     unordered_map<int64_t, unordered_map<int, int64_t>> allStateGroupMaps;
     map<int64_t, uint64_t> stateProtoHashes;
-    EXPECT_EQ(initStates(newConfig, stateAtomIdMap, allStateGroupMaps, stateProtoHashes), nullopt);
+    unordered_map<InvalidEntityKey, InvalidConfigReason> invalidEntities;
+    EXPECT_TRUE(initStates(newConfig, stateAtomIdMap, allStateGroupMaps, stateProtoHashes,
+                           invalidEntities));
 
     // Output data structures to validate.
     unordered_map<int64_t, int> newMetricProducerMap;

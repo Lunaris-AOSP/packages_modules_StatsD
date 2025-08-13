@@ -1819,22 +1819,27 @@ bool initConditions(const ConfigKey& key, const StatsdConfig& config,
     return allConditionsValid;
 }
 
-optional<InvalidConfigReason> initStates(
-        const StatsdConfig& config, unordered_map<int64_t, int>& stateAtomIdMap,
-        unordered_map<int64_t, unordered_map<int, int64_t>>& allStateGroupMaps,
-        map<int64_t, uint64_t>& stateProtoHashes) {
+bool initStates(const StatsdConfig& config, unordered_map<int64_t, int>& stateAtomIdMap,
+                unordered_map<int64_t, unordered_map<int, int64_t>>& allStateGroupMaps,
+                map<int64_t, uint64_t>& stateProtoHashes,
+                unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities) {
+    bool allStatesValid = true;
     for (int i = 0; i < config.state_size(); i++) {
         const State& state = config.state(i);
         const int64_t stateId = state.id();
-        stateAtomIdMap[stateId] = state.atom_id();
-
         string serializedState;
         if (!state.SerializeToString(&serializedState)) {
+            allStatesValid = false;
             ALOGE("Unable to serialize state %lld", (long long)stateId);
-            return createInvalidConfigReasonWithState(
-                    INVALID_CONFIG_REASON_STATE_SERIALIZATION_FAILED, state.id(), state.atom_id());
+            invalidEntities[{stateId, INVALID_ENTITY_TYPE_STATE}] =
+                    createInvalidConfigReasonWithState(
+                            INVALID_CONFIG_REASON_STATE_SERIALIZATION_FAILED, state.id(),
+                            state.atom_id());
+            continue;
         }
         stateProtoHashes[stateId] = Hash64(serializedState);
+
+        stateAtomIdMap[stateId] = state.atom_id();
 
         const StateMap& stateMap = state.map();
         for (const auto& group : stateMap.group()) {
@@ -1844,7 +1849,7 @@ optional<InvalidConfigReason> initStates(
         }
     }
 
-    return nullopt;
+    return allStatesValid;
 }
 
 optional<InvalidConfigReason> initMetrics(
@@ -2130,10 +2135,11 @@ optional<InvalidConfigReason> initStatsdConfig(
         return invalidEntities.begin()->second;
     }
 
-    invalidConfigReason = initStates(config, stateAtomIdMap, allStateGroupMaps, stateProtoHashes);
-    if (invalidConfigReason.has_value()) {
+    bool allStatesValid = initStates(config, stateAtomIdMap, allStateGroupMaps, stateProtoHashes,
+                                     invalidEntities);
+    if (!allStatesValid) {
         ALOGE("initStates failed");
-        return invalidConfigReason;
+        return invalidEntities.begin()->second;
     }
 
     invalidConfigReason = initMetrics(

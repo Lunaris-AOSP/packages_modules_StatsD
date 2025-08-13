@@ -539,17 +539,14 @@ bool updateConditions(const ConfigKey& key, const StatsdConfig& config,
     return allConditionsValid;
 }
 
-optional<InvalidConfigReason> updateStates(
-        const StatsdConfig& config, const map<int64_t, uint64_t>& oldStateProtoHashes,
-        unordered_map<int64_t, int>& stateAtomIdMap,
-        unordered_map<int64_t, unordered_map<int, int64_t>>& allStateGroupMaps,
-        map<int64_t, uint64_t>& newStateProtoHashes, set<int64_t>& replacedStates) {
+bool updateStates(const StatsdConfig& config, const map<int64_t, uint64_t>& oldStateProtoHashes,
+                  unordered_map<int64_t, int>& stateAtomIdMap,
+                  unordered_map<int64_t, unordered_map<int, int64_t>>& allStateGroupMaps,
+                  map<int64_t, uint64_t>& newStateProtoHashes, set<int64_t>& replacedStates,
+                  unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities) {
     // Share with metrics_manager_util.
-    optional<InvalidConfigReason> invalidConfigReason =
-            initStates(config, stateAtomIdMap, allStateGroupMaps, newStateProtoHashes);
-    if (invalidConfigReason.has_value()) {
-        return invalidConfigReason;
-    }
+    bool allStatesValid = initStates(config, stateAtomIdMap, allStateGroupMaps, newStateProtoHashes,
+                                     invalidEntities);
 
     for (const auto& [stateId, stateHash] : oldStateProtoHashes) {
         const auto& it = newStateProtoHashes.find(stateId);
@@ -557,7 +554,7 @@ optional<InvalidConfigReason> updateStates(
             replacedStates.insert(stateId);
         }
     }
-    return nullopt;
+    return allStatesValid;
 }
 // Returns true if any matchers in the metric activation were replaced.
 bool metricActivationDepsChange(const StatsdConfig& config,
@@ -1349,11 +1346,12 @@ optional<InvalidConfigReason> updateStatsdConfig(
         return invalidEntities.begin()->second;
     }
 
-    invalidConfigReason = updateStates(config, oldStateProtoHashes, stateAtomIdMap,
-                                       allStateGroupMaps, newStateProtoHashes, replacedStates);
-    if (invalidConfigReason.has_value()) {
+    bool allStatesValid =
+            updateStates(config, oldStateProtoHashes, stateAtomIdMap, allStateGroupMaps,
+                         newStateProtoHashes, replacedStates, invalidEntities);
+    if (!allStatesValid) {
         ALOGE("updateStates failed");
-        return invalidConfigReason;
+        return invalidEntities.begin()->second;
     }
 
     invalidConfigReason = updateMetrics(
