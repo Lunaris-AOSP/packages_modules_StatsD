@@ -34,6 +34,7 @@
 #include "logd/LogEventQueue.h"
 #include "packages/UidMap.h"
 #include "shell/ShellSubscriber.h"
+#include "socket/SocketLogEventControl.h"
 #include "statscompanion_util.h"
 #include "utils/MultiConditionTrigger.h"
 
@@ -465,7 +466,6 @@ private:
      */
     mutable std::mutex mShellSubscriberMutex;
     std::shared_ptr<LogEventQueue> mEventQueue;
-    std::shared_ptr<LogEventFilter> mLogEventFilter;
 
     std::unique_ptr<std::thread> mLogsReaderThread;
 
@@ -485,6 +485,8 @@ private:
     ScopedAIBinder_DeathRecipient mStatsCompanionServiceDeathRecipient;
 
     std::shared_ptr<AtomsInUseChangeDispatcher> mAtomsInUseChangeDispatcher;
+    std::shared_ptr<LogEventFilter> mLogEventFilter;
+    std::shared_ptr<SocketLogEventControl> mSocketLogEventControl;
 
     friend class StatsServiceConfigTest;
     friend class RestrictedConfigE2ETest;

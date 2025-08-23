@@ -163,13 +163,15 @@ StatsService::StatsService(const sp<UidMap>& uidMap, shared_ptr<LogEventQueue> q
                   }
               })),
       mEventQueue(queue),
-      mLogEventFilter(logEventFilter),
       mBootCompleteTrigger({kBootCompleteTag, kUidMapReceivedTag, kAllPullersRegisteredTag},
                            [this]() { onStatsdInitCompleted(kStatsdInitDelaySecs); }),
       mStatsCompanionServiceDeathRecipient(
               AIBinder_DeathRecipient_new(StatsService::statsCompanionServiceDied)),
-      mAtomsInUseChangeDispatcher(std::make_shared<AtomsInUseChangeDispatcher>()) {
+      mAtomsInUseChangeDispatcher(std::make_shared<AtomsInUseChangeDispatcher>()),
+      mLogEventFilter(logEventFilter),
+      mSocketLogEventControl(std::make_shared<SocketLogEventControl>()) {
     mAtomsInUseChangeDispatcher->addListener(mLogEventFilter);
+    mAtomsInUseChangeDispatcher->addListener(mSocketLogEventControl);
     mPullerManager = new StatsPullerManager();
     StatsPuller::SetUidMap(mUidMap);
     mConfigManager = new ConfigManager();
@@ -970,6 +972,7 @@ status_t StatsService::cmd_print_logs(int /*out*/, const Vector<String8>& args) 
     // Turning on print logs turns off pushed event filtering to enforce
     // complete log event buffer parsing
     mLogEventFilter->setFilteringEnabled(!enabled);
+    mSocketLogEventControl->setControlEnabled(!enabled);
     return NO_ERROR;
 }
 
@@ -1148,6 +1151,9 @@ void StatsService::onStatsdInitCompleted(int initEventDelaySecs) {
     }
 
     mProcessor->onStatsdInitCompleted(getElapsedRealtimeNs());
+    // to not stress I/O subsystem reasonable to postpone atom ids file creation and avoid
+    // high volume read file requests from many apps which will log their first atom
+    mSocketLogEventControl->setControlEnabled(true);
 }
 
 void StatsService::Startup() {
@@ -1166,6 +1172,9 @@ void StatsService::Startup() {
             pthread_setname_np(mLogsReaderThread->native_handle(), "statsd.reader");
         }
     }
+
+    // Enable the filter now since configs are initialized.
+    mLogEventFilter->setFilteringEnabled(true);
 }
 
 void StatsService::Terminate() {

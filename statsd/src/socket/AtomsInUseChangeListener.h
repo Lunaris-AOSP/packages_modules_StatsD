@@ -40,6 +40,9 @@ public:
     virtual void setAtomIds(AtomIdSet tagIds, ConsumerId consumer) = 0;
 };
 
+/**
+ * Propagates changes in atoms ids to its listeners
+ */
 class AtomsInUseChangeDispatcher : public AtomsInUseChangeListener {
 public:
     void setAtomIds(AtomIdSet tagIds, ConsumerId consumer) override {
