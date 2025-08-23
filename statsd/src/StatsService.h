@@ -484,6 +484,8 @@ private:
 
     ScopedAIBinder_DeathRecipient mStatsCompanionServiceDeathRecipient;
 
+    std::shared_ptr<AtomsInUseChangeDispatcher> mAtomsInUseChangeDispatcher;
+
     friend class StatsServiceConfigTest;
     friend class RestrictedConfigE2ETest;
 
@@ -517,6 +519,7 @@ private:
     FRIEND_TEST(AnomalyDurationDetectionE2eTest, TestDurationMetric_SUM_long_refractory_period);
 
     FRIEND_TEST(StatsServiceConfigTest, StatsServiceStatsdInitTest);
+    FRIEND_TEST(StatsServiceConfigTest, LogEventFilterOnSetPrintLogs);
 };
 
 }  // namespace statsd

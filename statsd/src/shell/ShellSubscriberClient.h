@@ -87,7 +87,7 @@ public:
         return kMaxSizeKb;
     }
 
-    void addAllAtomIds(LogEventFilter::AtomIdSet& allAtomIds) const;
+    void addAllAtomIds(AtomsInUseChangeListener::AtomIdSet& allAtomIds) const;
 
     // Minimum pull interval for callback subscriptions.
     static constexpr int64_t kMinCallbackPullIntervalMs = 60'000;  // 60 seconds.
