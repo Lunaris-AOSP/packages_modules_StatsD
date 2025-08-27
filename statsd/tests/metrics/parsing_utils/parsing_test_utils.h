@@ -83,6 +83,10 @@ protected:
     std::set<int64_t> noReportMetricIds;
 };
 
+std::vector<int> filterMatcherIndexesById(
+        const std::vector<sp<AtomMatchingTracker>>& atomMatchingTrackers,
+        const std::vector<int64_t>& ids);
+
 StatsdConfig createHistogramStatsdConfig();
 
 StatsdConfig createExplicitHistogramStatsdConfig(BinStarts bins);

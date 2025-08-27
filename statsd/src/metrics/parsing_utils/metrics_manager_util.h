@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <utils/JenkinsHash.h>
+
 #include <set>
 #include <unordered_map>
 #include <vector>
@@ -48,13 +50,12 @@ sp<AtomMatchingTracker> createAtomMatchingTracker(
 // input:
 // [predicate]: the input Predicate from the StatsdConfig
 // [index]: the index of the condition tracker
-// [atomMatchingTrackerMap]: map of atom matcher id to its index in allAtomMatchingTrackers
 // [invalidConfigReason]: logging ids if config is invalid
 // output:
 // new ConditionTracker, or null if the tracker is unable to be created
 sp<ConditionTracker> createConditionTracker(
-        const ConfigKey& key, const Predicate& predicate, int index,
-        const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
+        const ConfigKey& key, const Predicate& predicate,
+        const std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities,
         std::optional<InvalidConfigReason>& invalidConfigReason);
 
 // Get the hash of a metric, combining the activation if the metric has one.
@@ -291,12 +292,14 @@ std::optional<InvalidConfigReason> initSubscribersForSubscriptionType(
 // [atomMatchingTrackerMap]: this map should contain matcher name to index mapping
 // [allAtomMatchingTrackers]: should store the sp to all the AtomMatchingTracker
 // [allTagIdsToMatchersMap]: maps of tag ids to atom matchers
-// Returns nullopt if successful and InvalidConfigReason if not.
-std::optional<InvalidConfigReason> initAtomMatchingTrackers(
+// [invalidEntities]: map of entity id to a reason why the entity is invalid
+// Returns true if all matchers are valid
+bool initAtomMatchingTrackers(
         const StatsdConfig& config, const sp<UidMap>& uidMap,
         std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
         std::vector<sp<AtomMatchingTracker>>& allAtomMatchingTrackers,
-        std::unordered_map<int, std::vector<int>>& allTagIdsToMatchersMap);
+        std::unordered_map<int, std::vector<int>>& allTagIdsToMatchersMap,
+        std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 // Initialize ConditionTrackers
 // input:
@@ -309,14 +312,15 @@ std::optional<InvalidConfigReason> initAtomMatchingTrackers(
 // [trackerToConditionMap]: contain the mapping from index of
 //                        log tracker to condition trackers that use the log tracker
 // [initialConditionCache]: stores the initial conditions for each ConditionTracker
-// Returns nullopt if successful and InvalidConfigReason if not.
-std::optional<InvalidConfigReason> initConditions(
-        const ConfigKey& key, const StatsdConfig& config,
-        const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
-        std::unordered_map<int64_t, int>& conditionTrackerMap,
-        std::vector<sp<ConditionTracker>>& allConditionTrackers,
-        std::unordered_map<int, std::vector<int>>& trackerToConditionMap,
-        std::vector<ConditionState>& initialConditionCache);
+// [invalidEntities]: a map of entity id to the reason why the entity is invalid
+// Returns whether all conditions are valid
+bool initConditions(const ConfigKey& key, const StatsdConfig& config,
+                    const std::unordered_map<int64_t, int>& atomMatchingTrackerMap,
+                    std::unordered_map<int64_t, int>& conditionTrackerMap,
+                    std::vector<sp<ConditionTracker>>& allConditionTrackers,
+                    std::unordered_map<int, std::vector<int>>& trackerToConditionMap,
+                    std::vector<ConditionState>& initialConditionCache,
+                    std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 // Initialize State maps using State protos in the config. These maps will
 // eventually be passed to MetricProducers to initialize their state info.
@@ -327,11 +331,12 @@ std::optional<InvalidConfigReason> initConditions(
 // [allStateGroupMaps]: this map should contain the mapping from states ids and state
 //                      values to state group ids for all states
 // [stateProtoHashes]: contains a map of state id to the hash of the State proto from the config
-// Returns nullopt if successful and InvalidConfigReason if not.
-std::optional<InvalidConfigReason> initStates(
-        const StatsdConfig& config, std::unordered_map<int64_t, int>& stateAtomIdMap,
-        std::unordered_map<int64_t, std::unordered_map<int, int64_t>>& allStateGroupMaps,
-        std::map<int64_t, uint64_t>& stateProtoHashes);
+// [invalidEntities]: map of entity id to the reason why it is invalid.
+// Returns true if all states are valid.
+bool initStates(const StatsdConfig& config, std::unordered_map<int64_t, int>& stateAtomIdMap,
+                std::unordered_map<int64_t, std::unordered_map<int, int64_t>>& allStateGroupMaps,
+                std::map<int64_t, uint64_t>& stateProtoHashes,
+                std::unordered_map<InvalidEntityKey, InvalidConfigReason>& invalidEntities);
 
 // Initialize MetricProducers.
 // input:
