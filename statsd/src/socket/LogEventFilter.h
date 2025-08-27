@@ -55,7 +55,7 @@ public:
      * @param atomId
      * @return true if atom is used by any of consumer or filtering is disabled
      */
-    bool isAtomInUse(int atomId) const {
+    bool isAtomInUse(int32_t atomId) const {
         if (!mLogsFilteringEnabled) {
             return true;
         }
