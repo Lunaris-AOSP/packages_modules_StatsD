@@ -39,7 +39,7 @@ java_test_host {
         "truth",
     ],
     static_libs: [
-        "host-libprotobuf-java-full",
+        "libprotobuf-java-full",
         "platformprotos",
         "core_cts_test_resources",
         "perfetto_config-full",
