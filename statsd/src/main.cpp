@@ -85,37 +85,19 @@ void initSeedRandom() {
 }
 
 int main(int /*argc*/, char** /*argv*/) {
-    // Set up the looper
-    sp<Looper> looper(Looper::prepare(0 /* opts */));
-
     // Set up the binder
-    ABinderProcess_setThreadPoolMaxThreadCount(9);
+    ABinderProcess_setThreadPoolMaxThreadCount(2);
     ABinderProcess_startThreadPool();
 
     // Initialize boot flags
     FlagProvider::getInstance().initBootFlags({});
 
     std::shared_ptr<LogEventQueue> eventQueue =
-            std::make_shared<LogEventQueue>(50000); /*buffer limit. Buffer is NOT pre-allocated*/
+            std::make_shared<LogEventQueue>(2);
 
     sp<UidMap> uidMap = UidMap::getInstance();
 
     std::shared_ptr<LogEventFilter> logEventFilter = std::make_shared<LogEventFilter>();
-
-    initSeedRandom();
-
-    // Start reading events from the socket as early as possible.
-    // Processing from the queue is delayed until StatsService::startup to allow
-    // config initialization to occur before we start processing atoms.
-    if (flags::use_iouring() && IOUringSocketHandler::IsIouringSupported()) {
-        gSocketListener = new StatsSocketListenerIoUring(eventQueue, logEventFilter);
-    } else {
-        gSocketListener = new StatsSocketListener(eventQueue, logEventFilter);
-    }
-
-    ALOGI("Statsd starts to listen to socket.");
-    // Backlog and /proc/sys/net/unix/max_dgram_qlen set to large value
-    gSocketListener->startListener();
 
     // Create the service
     gStatsService = SharedRefBase::make<StatsService>(uidMap, eventQueue, logEventFilter);
@@ -134,9 +116,7 @@ int main(int /*argc*/, char** /*argv*/) {
         return -1;
     }
 
-    gStatsService->sayHiToStatsCompanion();
-
-    gStatsService->Startup();
+    ALOGI("statsd running in noop mode");
 
     // Use self-pipe to notify this thread to gracefully quit
     // when receiving SIGTERM
@@ -148,7 +128,6 @@ int main(int /*argc*/, char** /*argv*/) {
             if (i < 0) {
                 if (errno == EINTR) continue;
             }
-            gSocketListener->stopListener();
             gStatsService->Terminate();
             // return the signal handler to its default disposition, then raise the signal again
             signal(SIGTERM, SIG_DFL);
@@ -158,12 +137,7 @@ int main(int /*argc*/, char** /*argv*/) {
         }
     }).detach();
 
-    // Loop forever -- the reports run on this thread in a handler, and the
-    // binder calls remain responsive in their pool of one thread.
-    while (true) {
-        looper->pollAll(-1 /* timeoutMillis */);
-    }
-    ALOGW("statsd escaped from its loop.");
+    ABinderProcess_joinThreadPool();
 
     return 1;
 }
