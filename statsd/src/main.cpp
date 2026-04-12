@@ -98,6 +98,10 @@ int main(int /*argc*/, char** /*argv*/) {
     sp<UidMap> uidMap = UidMap::getInstance();
 
     std::shared_ptr<LogEventFilter> logEventFilter = std::make_shared<LogEventFilter>();
+    logEventFilter->setFilteringEnabled(true);
+
+    gSocketListener = new StatsSocketListener(eventQueue, logEventFilter);
+    gSocketListener->startListener();
 
     // Create the service
     gStatsService = SharedRefBase::make<StatsService>(uidMap, eventQueue, logEventFilter);
@@ -128,6 +132,7 @@ int main(int /*argc*/, char** /*argv*/) {
             if (i < 0) {
                 if (errno == EINTR) continue;
             }
+            gSocketListener->stopListener();
             gStatsService->Terminate();
             // return the signal handler to its default disposition, then raise the signal again
             signal(SIGTERM, SIG_DFL);

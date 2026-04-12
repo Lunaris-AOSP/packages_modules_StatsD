@@ -27,8 +27,10 @@
 
 class BufferWriterQueue {
 public:
-    constexpr static int kDelayOnFailedWriteMs = 5;
-    constexpr static int kQueueMaxSizeLimit = 4800;  // 2X max_dgram_qlen
+    constexpr static int kDelayOnFailedWriteMs = 50;
+    constexpr static int kMaxDelayOnFailedWriteMs = 2000;
+    constexpr static int kMaxWriteRetries = 20;
+    constexpr static int kQueueMaxSizeLimit = 4800;
 
     BufferWriterQueue();
     virtual ~BufferWriterQueue();

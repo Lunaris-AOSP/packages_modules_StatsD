@@ -111,6 +111,8 @@ void BufferWriterQueue::drainQueue() {
 
 void BufferWriterQueue::processCommands() {
     prctl(PR_SET_NAME, "socket_writer_queue");
+    int retryCount = 0;
+    int currentDelayMs = kDelayOnFailedWriteMs;
     while (true) {
         // temporary local thread copy
         Cmd cmd;
@@ -140,6 +142,8 @@ void BufferWriterQueue::processCommands() {
                 // buffer is NULL
                 mCmdQueue.pop();
             }
+            retryCount = 0;
+            currentDelayMs = kDelayOnFailedWriteMs;
         }
         // TODO (b/258003151): add logging info about retry count
 
@@ -151,7 +155,19 @@ void BufferWriterQueue::processCommands() {
         // in case of failed write due to socket overflow the sleep can be longer
         // to not overload socket continuously
         if (!writeSuccess) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(kDelayOnFailedWriteMs));
+            retryCount++;
+            if (retryCount >= kMaxWriteRetries) {
+                free(cmd.buffer);
+                {
+                    std::lock_guard lock(mMutex);
+                    mCmdQueue.pop();
+                }
+                retryCount = 0;
+                currentDelayMs = kDelayOnFailedWriteMs;
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(currentDelayMs));
+                currentDelayMs = std::min(currentDelayMs * 2, kMaxDelayOnFailedWriteMs);
+            }
         }
     }
 }
